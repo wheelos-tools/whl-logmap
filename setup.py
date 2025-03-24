@@ -22,6 +22,10 @@ setuptools.setup(
     ],
     package_dir={"": "."},
     packages=setuptools.find_packages(where="."),
+    install_requires=[
+        'cyber_record',
+        'record_msg',
+    ],
     entry_points={
         'console_scripts': [
             'whl_logmap = whl_logmap.main:main',

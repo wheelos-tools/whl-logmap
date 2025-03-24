@@ -19,7 +19,7 @@
 import math
 import sys
 
-from modules.common_msgs.map_msgs import map_pb2, map_lane_pb2
+from modules.map.proto import map_pb2, map_lane_pb2
 from shapely.geometry import LineString, Point
 
 LANE_WIDTH = 3.3

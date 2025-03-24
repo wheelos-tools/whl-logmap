@@ -19,9 +19,7 @@
 import math
 import sys
 
-from modules.common_msgs.map_msgs import map_pb2
-from modules.common_msgs.map_msgs import map_lane_pb2
-from modules.common_msgs.map_msgs import map_road_pb2
+from modules.map.proto import map_pb2, map_lane_pb2, map_road_pb2
 from shapely.geometry import LineString, Point
 
 LANE_WIDTH = 3.3
@@ -72,8 +70,8 @@ def create_lane(map, id):
     lane.length = 100.0
     lane.speed_limit = 20.0
     lane.turn = map_lane_pb2.Lane.NO_TURN
-    #lane.predecessor_id.add().id = str(id - 1)
-    #lane.successor_id.add().id = str(id + 1)
+    # lane.predecessor_id.add().id = str(id - 1)
+    # lane.successor_id.add().id = str(id + 1)
     left_boundary = lane.left_boundary.curve.segment.add()
     right_boundary = lane.right_boundary.curve.segment.add()
     central = lane.central_curve.segment.add()

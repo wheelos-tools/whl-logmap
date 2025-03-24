@@ -40,8 +40,9 @@ fbags = sys.argv[2:]
 with open(filename, 'w') as f:
     for fbag in fbags:
         record = Record(fbag)
-        for topic, message, t in record.read_messages('/apollo/localization/pose'):
-            x = message.pose.position.x
-            y = message.pose.position.y
-            f.write(str(x) + "," + str(y) + "\n")
+        for topic, message, t in record.read_messages_fallback():
+            if topic == "/apollo/localization/pose":
+                x = message.pose.position.x
+                y = message.pose.position.y
+                f.write(str(x) + "," + str(y) + "\n")
 print("File written to: %s" % filename)

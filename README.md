@@ -1,5 +1,10 @@
 # whl-logmap
 
+# Install
+```
+pip3 install whl_logmap
+```
+
 # cmd
  - extract_path
  - show_path
