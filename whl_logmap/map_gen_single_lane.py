@@ -21,6 +21,7 @@ import sys
 
 from modules.map.proto import map_pb2, map_lane_pb2, map_road_pb2
 from shapely.geometry import LineString, Point
+from google.protobuf import text_format
 
 LANE_WIDTH = 3.3
 
@@ -105,7 +106,6 @@ length = int(path.length)
 
 extra_roi_extension = float(sys.argv[3])
 
-fmap = open(sys.argv[2], 'w')
 id = 0
 map = map_pb2.Map()
 road = map.road.add()
@@ -198,5 +198,8 @@ for i in range(length - 1):
     right_sample.s = i % 100 + 1
     right_sample.width = LANE_WIDTH / 2.0
 
-fmap.write(str(map))
-fmap.close()
+with open(sys.argv[2], 'w') as f:
+    # save txt format
+    f.write(text_format.MessageToString(map))
+    # save bin format
+    f.write(map.SerializeToString())
