@@ -286,8 +286,11 @@ for i in range(length - 1):
     right_sample.s = i % 100 + 1
     right_sample.width = LANE_WIDTH / 2.0
 
-with open("map_" + fpath.split("/")[-1] + ".txt", 'w') as f:
-    # save txt format
-    f.write(text_format.MessageToString(map))
-    # save bin format
-    f.write(map.SerializeToString())
+
+# save txt format
+with open("map_" + fpath.split("/")[-1] + ".txt", 'w') as f_txt:
+    f_txt.write(text_format.MessageToString(map))
+
+# save bin format
+with open("map_" + fpath.split("/")[-1] + ".bin", 'wb') as f_bin:
+    f_bin.write(map.SerializeToString())
