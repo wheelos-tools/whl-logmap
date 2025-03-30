@@ -11,20 +11,18 @@ pip3 install whl_logmap
  - gen_map
  - signal
 
-## extract_path
-
-```shell
-whl_logmap extract_path xxx.record
-```
-
 ## show_path
 
 ```shell
 whl_logmap show_path xxx.txt
+
+python3 whl_logmap/plot_path.py map/path.txt
 ```
 
 ## gen_map
 
 ```shell
-whl_logmap gen_map xxx.txt
+whl_logmap gen_map --input_path=data
+
+python3 whl_logmap/main.py --input_path=data
 ```
