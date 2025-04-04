@@ -31,7 +31,7 @@ from map_gen import read_points_from_file, save_map_to_file, process_path
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-def plot_points(points: list[tuple[float, float]], output_dir: str):  # 新增函数
+def plot_points(points: list[tuple[float, float]], output_dir: str): 
     """Plots a list of (x, y) points using matplotlib and saves to output_dir."""
     if not points:
         logging.warning("No points to plot.")
@@ -49,8 +49,8 @@ def plot_points(points: list[tuple[float, float]], output_dir: str):  # 新增�
     plt.gca().set_aspect('equal', adjustable='box')
     output_path = os.path.join(output_dir, 'output.png')
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    plt.close()  # 防止内存泄漏
-    logging.info(f"轨迹图已保存至 {output_path}")
+    plt.close()  
+    logging.info(f"Trajectory diagram has been saved to {output_path}")
 
 def main(args=None):
     """Main function to process the path and generate map data."""
