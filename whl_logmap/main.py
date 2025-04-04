@@ -19,38 +19,18 @@ import os
 import sys
 import argparse
 import logging
-import matplotlib.pyplot as plt 
 
 from modules.map.proto import map_pb2
 from shapely.geometry import LineString
 
 from extract_path import SortMode, extract_path, get_sorted_records
 from map_gen import read_points_from_file, save_map_to_file, process_path
+import plot_path 
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-def plot_points(points: list[tuple[float, float]], output_dir: str): 
-    """Plots a list of (x, y) points using matplotlib and saves to output_dir."""
-    if not points:
-        logging.warning("No points to plot.")
-        return
-
-    x_coords = [p[0] for p in points]
-    y_coords = [p[1] for p in points]
-
-    plt.figure(figsize=(8, 6))
-    plt.scatter(x_coords, y_coords)
-    plt.xlabel("X Coordinate")
-    plt.ylabel("Y Coordinate")
-    plt.title("Path Points")
-    plt.grid(True)
-    plt.gca().set_aspect('equal', adjustable='box')
-    output_path = os.path.join(output_dir, 'output.png')
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    plt.close()  
-    logging.info(f"Trajectory diagram has been saved to {output_path}")
 
 def main(args=None):
     """Main function to process the path and generate map data."""
@@ -89,6 +69,10 @@ def main(args=None):
                 "Could not read any valid path points from the input file.")
             sys.exit(1)
 
+        plot_output_file = os.path.join(output_path, 'map/output.png')
+        logging.info(f"Plotting path points to {plot_output_file}")
+        plot_path.plot_points(path_points)
+   
         path = LineString(path_points)
         logging.info(f"Path created with {len(path_points)} points.")
 
@@ -98,10 +82,6 @@ def main(args=None):
 
         logging.info(f"Saving map data to: {output_path}")
         save_map_to_file(map_data, output_path)
-
-        logging.info("Generating path visualization...")
-        plot_points(path_points, output_path)
-        
         print("Map data generation complete.")
 
     except FileNotFoundError:
