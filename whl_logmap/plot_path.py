@@ -38,7 +38,7 @@ def plot_points(points: list[tuple[float, float]]):
     plt.title("Path Points")
     plt.grid(True)
     plt.gca().set_aspect('equal', adjustable='box')  # Ensure equal aspect ratio
-    plt.show()
+    plt.savefig('map/output.png', dpi=300, bbox_inches='tight')
 
 
 if __name__ == "__main__":
