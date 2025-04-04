@@ -14,21 +14,23 @@ fi
 # Define your map directory name from the input argument
 YOUR_MAP_DIR="$1"
 
-# Construct the full path to your map directory
-NEW_MAP_PATH="${APOLLO_MAP_PATH}/${YOUR_MAP_DIR}"
-
-if [ -d "${NEW_MAP_PATH}" ]; then
-  echo "Warning: The directory ${NEW_MAP_PATH} already exists. It will be removed."
-  rm -rf "${NEW_MAP_PATH}"
-fi
-
 # Check if the source map directory exists
 if [ ! -d "${YOUR_MAP_DIR}" ]; then
   echo "Error: The source map directory '${YOUR_MAP_DIR}' does not exist."
   exit 1
 fi
 
-cp -r "${YOUR_MAP_DIR}" "${APOLLO_MAP_PATH}"
+MAP_NAME=$(basename "${YOUR_MAP_DIR}")
+
+# Construct the full path to your map directory
+NEW_MAP_PATH="${APOLLO_MAP_PATH}/${MAP_NAME}"
+
+if [ -d "${NEW_MAP_PATH}" ]; then
+  echo "Warning: The directory ${NEW_MAP_PATH} already exists. It will be removed."
+  rm -rf "${NEW_MAP_PATH}"
+fi
+
+cp -r "${YOUR_MAP_DIR}/." "${NEW_MAP_PATH}"
 
 # Define the executable file paths for sim_map_generator and topo_creator
 SIM_MAP_GENERATOR="./bazel-bin/modules/map/tools/sim_map_generator"
@@ -54,4 +56,4 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo "Map generation and topology creation complete!"
+echo "The map is located at: ${NEW_MAP_PATH}"
