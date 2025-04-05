@@ -14,12 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Plot points from a file using matplotlib.
+"""
+
 import logging
 import sys
 
 import matplotlib.pyplot as plt
 
-from map_gen import read_points_from_file
+from whl_logmap.map_gen import read_points_from_file
 
 
 def plot_points(points: list[tuple[float, float]], output_file: str = 'map/output.png'):
@@ -48,7 +52,8 @@ def plot_points(points: list[tuple[float, float]], output_file: str = 'map/outpu
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        logging.error("Usage: python script.py <input_file> [output_image_file]")
+        logging.error(
+            "Usage: python script.py <input_file> [output_image_file]")
         sys.exit(1)
 
     output_path_file = sys.argv[1]

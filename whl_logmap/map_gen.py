@@ -320,7 +320,7 @@ def save_map_to_file(map_object: map_pb2.Map, output_filepath: str):
     # Save as text format
     txt_filepath = os.path.join(output_filepath, "base_map.txt")
     try:
-        with open(txt_filepath, 'w') as f_txt:
+        with open(txt_filepath, 'w', encoding='utf-8') as f_txt:
             f_txt.write(text_format.MessageToString(map_object))
         print(f"Map text format saved to: {txt_filepath}")
     except Exception as e:

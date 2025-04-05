@@ -23,9 +23,9 @@ import logging
 from modules.map.proto import map_pb2
 from shapely.geometry import LineString
 
-from extract_path import SortMode, extract_path, get_sorted_records
-from map_gen import read_points_from_file, save_map_to_file, process_path
-import plot_path
+from whl_logmap.extract_path import SortMode, extract_path, get_sorted_records
+from whl_logmap.map_gen import read_points_from_file, save_map_to_file, process_path
+import whl_logmap.plot_path as plot_path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -54,7 +54,8 @@ def main(args=None):
         record_files = get_sorted_records(input_path, sort_mode=SortMode.TIME)
 
         if not os.path.exists(output_path):
-            logging.info(f"Output path '{output_path}' not exists. Createing it.")
+            logging.info(
+                f"Output path '{output_path}' not exists. Createing it.")
             os.makedirs(output_path, exist_ok=True)
         logging.info(f"Output path created: {output_path}")
 
@@ -70,7 +71,7 @@ def main(args=None):
                 "Could not read any valid path points from the input file.")
             sys.exit(1)
 
-        plot_output_file = os.path.join(output_path, 'map/output.png')
+        plot_output_file = os.path.join(output_path, 'output.png')
         logging.info(f"Plotting path points to {plot_output_file}")
         plot_path.plot_points(path_points, plot_output_file)
 

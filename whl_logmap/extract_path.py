@@ -32,7 +32,11 @@ from cyber_record.record import Record
 
 
 class SortMode(Enum):
-    # Enum to define sorting modes
+    """_summary_
+
+    Args:
+        Enum (_type_): Enumeration for sorting modes.
+    """
     TIME = 0  # Sort by file modification time
     NAME = 1  # Sort by file name
 
@@ -72,25 +76,17 @@ def extract_path(record_files: List[str], output_file: str) -> bool:
     Returns:
         True if the file is successfully written, False otherwise.
     """
-    try:
-        # Open the output file for writing
-        with open(output_file, 'w') as f:
-            for record_file in record_files:
-                # Read each record file
-                record = Record(record_file)
-                for topic, message, t in record.read_messages_fallback():
-                    # Check if the topic matches the desired one
-                    if topic == "/apollo/localization/pose":
-                        # Extract x and y coordinates from the message
-                        x = message.pose.position.x
-                        y = message.pose.position.y
-                        # Write the coordinates to the output file
-                        f.write(f"{x},{y}\n")
-        print(f"File written to: {output_file}")
-        return True
-    except Exception as e:
-        # Handle exceptions and print the error message
-        import traceback
-        print(f"Error writing to file {output_file}: {e}")
-        traceback.print_exc()
-        return False
+    with open(output_file, 'w', encoding='utf-8') as f:
+        for record_file in record_files:
+            # Read each record file
+            record = Record(record_file)
+            for topic, message, _ in record.read_messages_fallback():
+                # Check if the topic matches the desired one
+                if topic == "/apollo/localization/pose":
+                    # Extract x and y coordinates from the message
+                    x = message.pose.position.x
+                    y = message.pose.position.y
+                    # Write the coordinates to the output file
+                    f.write(f"{x},{y}\n")
+    print(f"File written to: {output_file}")
+    return True
