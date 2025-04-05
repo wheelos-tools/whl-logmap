@@ -25,7 +25,7 @@ from shapely.geometry import LineString
 
 from extract_path import SortMode, extract_path, get_sorted_records
 from map_gen import read_points_from_file, save_map_to_file, process_path
-import plot_path 
+import plot_path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -37,7 +37,7 @@ def main(args=None):
     parser = argparse.ArgumentParser(
         description="Generates map data from a path file.")
     parser.add_argument(
-        "--input_path", type=str, help="Path to the input file containing path points (CSV format: x,y).")
+        "--input_path", type=str, required=True, help="Path to the input file containing path points (CSV format: x,y).")
     parser.add_argument(
         "--output_path", type=str, default="map", help="Path to the output map file (will create .txt and .bin files).")
     parser.add_argument("--extra_roi_extension", type=float, default=0.3,
@@ -57,6 +57,7 @@ def main(args=None):
             logging.info(f"Output path '{output_path}' not exists. Createing it.")
             os.makedirs(output_path, exist_ok=True)
         logging.info(f"Output path created: {output_path}")
+
         output_path_file = os.path.join(output_path, "path.txt")
         logging.info(f"Extracting path to: {output_path_file}")
         extract_path(record_files, output_path_file)
@@ -71,8 +72,8 @@ def main(args=None):
 
         plot_output_file = os.path.join(output_path, 'map/output.png')
         logging.info(f"Plotting path points to {plot_output_file}")
-        plot_path.plot_points(path_points)
-   
+        plot_path.plot_points(path_points, plot_output_file)
+
         path = LineString(path_points)
         logging.info(f"Path created with {len(path_points)} points.")
 

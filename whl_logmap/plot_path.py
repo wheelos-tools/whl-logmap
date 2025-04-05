@@ -22,8 +22,13 @@ import matplotlib.pyplot as plt
 from map_gen import read_points_from_file
 
 
-def plot_points(points: list[tuple[float, float]]):
-    """Plots a list of (x, y) points using matplotlib."""
+def plot_points(points: list[tuple[float, float]], output_file: str = 'map/output.png'):
+    """Plots a list of (x, y) points using matplotlib.
+
+    Args:
+        points: A list of (x, y) coordinate tuples.
+        output_file: The path to save the plot. Defaults to 'map/output.png'.
+    """
     if not points:
         logging.warning("No points to plot.")
         return
@@ -38,10 +43,14 @@ def plot_points(points: list[tuple[float, float]]):
     plt.title("Path Points")
     plt.grid(True)
     plt.gca().set_aspect('equal', adjustable='box')  # Ensure equal aspect ratio
-    plt.savefig('map/output.png', dpi=300, bbox_inches='tight')
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        logging.error("Usage: python script.py <input_file> [output_image_file]")
+        sys.exit(1)
+
     output_path_file = sys.argv[1]
     path_points = read_points_from_file(output_path_file)
     plot_points(path_points)

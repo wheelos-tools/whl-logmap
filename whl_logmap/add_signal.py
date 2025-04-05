@@ -77,5 +77,5 @@ for stop_line in signal.stop_line:
             lanes_map[lane_id].overlap_id.add().id = overlap.id.id
 map.signal.add().CopyFrom(signal)
 
-with open(map_file + "_" + fsignal_file, 'w') as fmap:
+with open(map_file + "_" + signal_file, 'w') as fmap:
     fmap.write(str(map))

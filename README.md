@@ -1,28 +1,23 @@
 # whl-logmap
 
-# Install
-```
+A tool to generate map data from path files.
+
+## Install
+
+```bash
 pip3 install whl_logmap
 ```
 
-# cmd
- - extract_path
- - show_path
- - gen_map
- - signal
+## Quick Start
 
-## show_path
+Generate map data from a path file (CSV format with x,y values):
 
-```shell
-whl_logmap show_path xxx.txt
-
-python3 whl_logmap/plot_path.py map/path.txt
+```bash
+whl_logmap --input_path=your_record_dir
 ```
 
-## gen_map
+## Options
 
-```shell
-whl_logmap gen_map --input_path=data
-
-python3 whl_logmap/main.py --input_path=data
-```
+- **--input_path** (required): Path to the input file containing path points.
+- **--output_path**: Path to the output directory (default: `"map"`). The tool will create corresponding `.txt` and `.bin` files.
+- **--extra_roi_extension**: Extra ROI extension distance (default: `0.3`).
