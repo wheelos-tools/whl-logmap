@@ -19,7 +19,6 @@
 from typing import Tuple
 import math
 import os
-import sys
 
 from modules.map.proto import map_pb2, map_lane_pb2, map_road_pb2, map_geometry_pb2
 from shapely.geometry import LineString, Point
@@ -276,62 +275,3 @@ def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension:
         lane.right_boundary.length = lane.length
         # TODO(zero): Use segment[0], Need to ensure that there is only one segment
         lane.central_curve.segment[0].length = lane.length
-
-
-def read_points_from_file(filepath: str) -> list[tuple[float, float]]:
-    """Reads path points from a file.
-
-    Args:
-        filepath: The path to the file.
-
-    Returns:
-        A list of tuples containing the coordinates of the path points.
-    """
-    points = []
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                data = line.split(',')
-                if len(data) == 2:
-                    try:
-                        x = float(data[0])
-                        y = float(data[1])
-                        points.append((x, y))
-                    except ValueError:
-                        print(
-                            f"Warning: Skipping line {f.tell()} with invalid coordinate format: {line}")
-                elif line:  # Skip empty lines
-                    print(
-                        f"Warning: Skipping line with incorrect number of values: {line}")
-    except FileNotFoundError:
-        print(f"Error: Input file not found: {filepath}")
-        sys.exit(1)
-    return points
-
-
-def save_map_to_file(map_object: map_pb2.Map, output_filepath: str):
-    """Saves the map data to text and binary files.
-
-    Args:
-        map_object: The map object.
-        output_filepath: The output file path.
-    """
-    # Save as text format
-    txt_filepath = os.path.join(output_filepath, "base_map.txt")
-    try:
-        with open(txt_filepath, 'w', encoding='utf-8') as f_txt:
-            f_txt.write(text_format.MessageToString(map_object))
-        print(f"Map text format saved to: {txt_filepath}")
-    except Exception as e:
-        print(f"Error: Could not convert map object to text format: {e}")
-
-    # Save as binary format
-    bin_filepath = os.path.join(output_filepath, "base_map.bin")
-    try:
-        # Ensure the directory exists
-        with open(bin_filepath, 'wb') as f_bin:
-            f_bin.write(map_object.SerializeToString())
-        print(f"Map binary format saved to: {bin_filepath}")
-    except IOError as e:
-        print(f"Error: Could not save map binary file to {bin_filepath}: {e}")

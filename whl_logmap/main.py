@@ -24,8 +24,9 @@ from modules.map.proto import map_pb2
 from shapely.geometry import LineString
 
 from whl_logmap.extract_path import SortMode, extract_path, get_sorted_records
-from whl_logmap.map_gen import read_points_from_file, save_map_to_file, process_path
-import whl_logmap.plot_path as plot_path
+import whl_logmap.map_gen as map_gen
+import whl_logmap.utils as utils
+import whl_logmap.preprocess as preprocess
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -37,12 +38,17 @@ def main(args=None):
     parser = argparse.ArgumentParser(
         description="Generates map data from a path file.")
     parser.add_argument(
-        "--input_path", type=str, required=True, help="Path to the input file containing path points (CSV format: x,y).")
+        "-i", "--input_path", type=str, required=True,
+        help="Path to the input file containing path points (CSV format: x,y).")
     parser.add_argument(
-        "--output_path", type=str, default="map", help="Path to the output map file (will create .txt and .bin files).")
-    parser.add_argument("--extra_roi_extension", type=float, default=0.3,
-                        help="Extra ROI extension distance.")
-
+        "-o", "--output_path", type=str, default="map",
+        help="Path to the output map file (will create .txt and .bin files).")
+    parser.add_argument(
+        "--extra_roi_extension", type=float, default=0.3,
+        help="Extra ROI extension distance.")
+    parser.add_argument(
+        "-f", "--filter", type=str, default="gaussian_filter",
+        help="Filter method to apply (e.g., gaussian_filter, median_filter, etc.).")
     parsed_args = parser.parse_args(args)
 
     input_path = parsed_args.input_path
@@ -57,33 +63,34 @@ def main(args=None):
             logging.info(
                 f"Output path '{output_path}' not exists. Createing it.")
             os.makedirs(output_path, exist_ok=True)
-        logging.info(f"Output path created: {output_path}")
 
         output_path_file = os.path.join(output_path, "path.txt")
         logging.info(f"Extracting path to: {output_path_file}")
         extract_path(record_files, output_path_file)
 
-        logging.info(f"Reading path points from: {output_path_file}")
-        path_points = read_points_from_file(output_path_file)
-
-        if not path_points:
+        trajectory = utils.read_points_from_file(output_path_file)
+        if trajectory.size == 0:
             logging.error(
                 "Could not read any valid path points from the input file.")
             sys.exit(1)
 
+        # Downsample the trajectory for efficiency (taking every 10th point)
+        trajectory = trajectory[::10]
+        filtered_trajectory = preprocess.filter_trajectory(
+            trajectory, filter_type=parsed_args.filter, sigma=1.0)
+        logging.info("Filtered trajectory points.")
+
         plot_output_file = os.path.join(output_path, 'output.png')
         logging.info(f"Plotting path points to {plot_output_file}")
-        plot_path.plot_points(path_points, plot_output_file)
-
-        path = LineString(path_points)
-        logging.info(f"Path created with {len(path_points)} points.")
+        utils.plot_points(filtered_trajectory, plot_output_file)
 
         map_data = map_pb2.Map()
+        path = LineString(filtered_trajectory)
         logging.info("Processing path to generate map data.")
-        process_path(map_data, path, extra_roi_extension)
+        map_gen.process_path(map_data, path, extra_roi_extension)
 
         logging.info(f"Saving map data to: {output_path}")
-        save_map_to_file(map_data, output_path)
+        utils.save_map_to_file(map_data, output_path)
         print("Map data generation complete.")
 
     except FileNotFoundError:

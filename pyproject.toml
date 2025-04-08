@@ -23,7 +23,8 @@ dependencies = [
   "cyber_record",
   "record_msg",
   "shapely",
-  "matplotlib"
+  "matplotlib",
+  "scipy"
 ]
 
 keywords = ["logmap", "wheelos", "gis", "mapping"]
