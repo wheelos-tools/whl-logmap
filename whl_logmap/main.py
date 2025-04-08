@@ -24,8 +24,10 @@ from modules.map.proto import map_pb2
 from shapely.geometry import LineString
 
 from whl_logmap.extract_path import SortMode, extract_path, get_sorted_records
-from whl_logmap.map_gen import read_points_from_file, save_map_to_file, process_path
+import whl_logmap.map_gen as map_gen
 import whl_logmap.plot_path as plot_path
+import whl_logmap.utils as utils
+import whl_logmap.preprocess as preprocess
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -57,33 +59,32 @@ def main(args=None):
             logging.info(
                 f"Output path '{output_path}' not exists. Createing it.")
             os.makedirs(output_path, exist_ok=True)
-        logging.info(f"Output path created: {output_path}")
 
         output_path_file = os.path.join(output_path, "path.txt")
         logging.info(f"Extracting path to: {output_path_file}")
         extract_path(record_files, output_path_file)
 
-        logging.info(f"Reading path points from: {output_path_file}")
-        path_points = read_points_from_file(output_path_file)
-
-        if not path_points:
+        trajectory = utils.read_points_from_file(output_path_file)
+        if not trajectory:
             logging.error(
                 "Could not read any valid path points from the input file.")
             sys.exit(1)
 
+        trajectory = trajectory[::10]
+        filtered_trajectory = preprocess.filter_trajectory(
+            trajectory, sigma=1.0)
+
         plot_output_file = os.path.join(output_path, 'output.png')
         logging.info(f"Plotting path points to {plot_output_file}")
-        plot_path.plot_points(path_points, plot_output_file)
-
-        path = LineString(path_points)
-        logging.info(f"Path created with {len(path_points)} points.")
+        plot_path.plot_points(filtered_trajectory, plot_output_file)
 
         map_data = map_pb2.Map()
+        path = LineString(filtered_trajectory)
         logging.info("Processing path to generate map data.")
-        process_path(map_data, path, extra_roi_extension)
+        map_gen.process_path(map_data, path, extra_roi_extension)
 
         logging.info(f"Saving map data to: {output_path}")
-        save_map_to_file(map_data, output_path)
+        utils.save_map_to_file(map_data, output_path)
         print("Map data generation complete.")
 
     except FileNotFoundError:
