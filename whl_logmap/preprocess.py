@@ -16,82 +16,184 @@
 
 
 import numpy as np
-from scipy.ndimage import median_filter, uniform_filter, gaussian_filter1d
+from scipy.interpolate import interp1d
 from scipy.signal import savgol_filter, medfilt
 
+# ==============================
+# 1. Outlier Filtering: Median Filter
+# ==============================
 
-def filter_trajectory(trajectory: np.ndarray, filter_type: str = "gaussian_filter", **kwargs) -> np.ndarray:
+
+def filter_outliers(points, kernel_size=3, threshold_factor=3.0):
+    x = points[:, 0]
+    y = points[:, 1]
+
+    # Smooth the data using median filter
+    x_filtered = medfilt(x, kernel_size)
+    y_filtered = medfilt(y, kernel_size)
+
+    # Calculate the absolute difference between original and smoothed data
+    x_diff = np.abs(x - x_filtered)
+    y_diff = np.abs(y - y_filtered)
+
+    # Calculate threshold based on median absolute deviation
+    x_threshold = threshold_factor * np.median(x_diff)
+    y_threshold = threshold_factor * np.median(y_diff)
+
+    # Determine outliers (either x or y deviation exceeds threshold)
+    is_outlier = (x_diff > x_threshold) | (y_diff > y_threshold)
+
+    # Return non-outlier points using boolean indexing
+    return points[~is_outlier]
+
+# =========================================
+# 2. Ramer-Douglas-Peucker (RDP) Algorithm
+# =========================================
+
+
+def rdp(points, epsilon):
     """
-    Filters a vehicle trajectory (an Nx2 numpy array, each row is [x, y]) using one of several filtering methods.
+    Simplify the curve using the RDP algorithm.
 
-    Parameters:
-        trajectory: np.ndarray
-            Trajectory data with shape (N, 2)
-        filter_type: str
-            The type of filter to apply. Options include:
-              - 'median_filter' : using scipy.ndimage.median_filter
-              - 'uniform_filter': using scipy.ndimage.uniform_filter
-              - 'gaussian_filter': using scipy.ndimage.gaussian_filter1d
-              - 'savgol_filter'  : using scipy.signal.savgol_filter
-              - 'medfilt'        : using scipy.signal.medfilt
-        **kwargs:
-            Additional filter-specific parameters:
-              For median_filter and uniform_filter:
-                  size (int or tuple): The window size (default is 3)
-              For gaussian_filter:
-                  sigma (float): The standard deviation for Gaussian kernel (default is 1.0)
-              For savgol_filter:
-                  window_length (int): Must be odd (default is 5)
-                  polyorder (int): The order of the polynomial (default is 2)
-              For medfilt:
-                  kernel_size (int or tuple): The size of the kernel (default is 5)
+    Args:
+      points: (N,2) array of 2D trajectory points
+      epsilon: distance threshold; points with smaller deviation will be discarded
 
     Returns:
-        np.ndarray: The filtered trajectory with the same shape (N, 2)
+      Simplified trajectory points
     """
-    if not isinstance(trajectory, np.ndarray):
-        raise ValueError("The input trajectory must be of type np.ndarray.")
-    if trajectory.ndim != 2 or trajectory.shape[1] != 2:
-        raise ValueError("The shape of the input trajectory must be (N, 2).")
+    if points.shape[0] < 3:
+        return points
 
-    # Separate the x and y signals
-    x = trajectory[:, 0]
-    y = trajectory[:, 1]
+    # Compute the line vector from the first to the last point
+    start, end = points[0], points[-1]
+    line_vec = end - start
+    line_len = np.linalg.norm(line_vec)
 
-    if filter_type == 'median_filter':
-        size = kwargs.get('size', 3)
-        x_filtered = median_filter(x, size=size)
-        y_filtered = median_filter(y, size=size)
-
-    elif filter_type == 'uniform_filter':
-        size = kwargs.get('size', 3)
-        x_filtered = uniform_filter(x, size=size)
-        y_filtered = uniform_filter(y, size=size)
-
-    elif filter_type == 'gaussian_filter':
-        # Use gaussian_filter1d to filter along one axis
-        sigma = kwargs.get('sigma', 1.0)
-        x_filtered = gaussian_filter1d(x, sigma=sigma)
-        y_filtered = gaussian_filter1d(y, sigma=sigma)
-
-    elif filter_type == 'savgol_filter':
-        window_length = kwargs.get('window_length', 5)
-        polyorder = kwargs.get('polyorder', 2)
-        # savgol_filter requires window_length to be odd and less than the signal length
-        if window_length % 2 == 0:
-            raise ValueError("savgol_filter: window_length must be odd")
-        x_filtered = savgol_filter(
-            x, window_length=window_length, polyorder=polyorder)
-        y_filtered = savgol_filter(
-            y, window_length=window_length, polyorder=polyorder)
-
-    elif filter_type == 'medfilt':
-        kernel_size = kwargs.get('kernel_size', 5)
-        x_filtered = medfilt(x, kernel_size=kernel_size)
-        y_filtered = medfilt(y, kernel_size=kernel_size)
-
+    # Avoid division by zero
+    if line_len == 0:
+        dists = np.linalg.norm(points - start, axis=1)
     else:
-        raise ValueError(f"Unknown filter_type: {filter_type}")
+        # Compute perpendicular distance from each point to the line
+        norm_line_vec = line_vec / line_len
+        vec_from_start = points - start
+        proj_lengths = np.dot(vec_from_start, norm_line_vec)
+        proj_points = np.outer(proj_lengths, norm_line_vec) + start
+        dists = np.linalg.norm(points - proj_points, axis=1)
 
-    # Recombine the filtered x and y signals back into an (N,2) array
-    return np.stack((x_filtered, y_filtered), axis=1)
+    # Find the point with the maximum distance to the line
+    idx = np.argmax(dists)
+    max_dist = dists[idx]
+
+    if max_dist > epsilon:
+        # Recursively simplify the two segments
+        first_half = rdp(points[:idx+1], epsilon)
+        second_half = rdp(points[idx:], epsilon)
+        # Combine the results (avoid duplicating the middle point)
+        return np.vstack((first_half[:-1], second_half))
+    else:
+        # All points are close enough to the line; keep only endpoints
+        return np.array([start, end])
+
+# =================================================
+# 3. Uniform Resampling: Fill Sparse Regions via Interpolation
+# =================================================
+
+
+def uniform_resample(points, spacing=1.0, kind='cubic'):
+    """
+    Uniformly resample trajectory points by:
+      1. Calculating cumulative arc length
+      2. Interpolating x and y using interp1d
+
+    Args:
+      points: (N,2) array of original trajectory points (should be simplified or evenly spaced)
+      spacing: desired distance between new sample points
+      kind: interpolation method ('linear', 'cubic', etc.)
+
+    Returns:
+      Uniformly resampled trajectory points
+    """
+    # Compute distances and cumulative distance
+    distances = np.sqrt(np.sum(np.diff(points, axis=0)**2, axis=1))
+    cumdist = np.concatenate(([0], np.cumsum(distances)))
+
+    # Generate new sample positions
+    new_distances = np.arange(0, cumdist[-1], spacing)
+
+    # Interpolate x and y separately
+    interp_func_x = interp1d(cumdist, points[:, 0], kind=kind)
+    interp_func_y = interp1d(cumdist, points[:, 1], kind=kind)
+
+    new_x = interp_func_x(new_distances)
+    new_y = interp_func_y(new_distances)
+    new_points = np.column_stack((new_x, new_y))
+
+    return new_points
+
+# ================================================
+# 4. Smoothing: Savitzky-Golay Filter
+# ================================================
+
+
+def smooth_track(points, window_length=5, polyorder=3):
+    """
+    Smooth trajectory points using Savitzky-Golay filter.
+
+    Args:
+      points: (N,2) array of uniformly resampled points
+      window_length: smoothing window size (must be odd)
+      polyorder: order of the polynomial used in filtering
+
+    Returns:
+      Smoothed trajectory points
+    """
+    # Apply the filter to x and y separately
+    x_smooth = savgol_filter(points[:, 0], window_length, polyorder)
+    y_smooth = savgol_filter(points[:, 1], window_length, polyorder)
+    return np.column_stack((x_smooth, y_smooth))
+
+# =====================================================
+# Pipeline: A Full Trajectory Optimization Example
+# =====================================================
+
+
+def optimize_trajectory(raw_points,
+                        kernel_size=3,
+                        threshold_factor=3.0,
+                        rdp_epsilon=0.1,
+                        resample_spacing=1.0,
+                        smooth_window=5,
+                        smooth_polyorder=3):
+    """
+    Given raw trajectory points, perform the following:
+      1. Outlier filtering
+      2. RDP simplification (reduce dense segments)
+      3. Uniform resampling (fill sparse segments)
+      4. Savitzky-Golay smoothing
+
+    Args:
+      raw_points: (N,2) original trajectory points
+      rdp_epsilon: RDP simplification threshold
+      resample_spacing: spacing for uniform resampling
+      smooth_window, smooth_polyorder: smoothing parameters
+
+    Returns:
+      Optimized trajectory points
+    """
+    # 1. Filter outliers
+    filtered_points = filter_outliers(
+        raw_points, kernel_size, threshold_factor)
+
+    # 2. Simplify trajectory using RDP
+    simplified_points = rdp(filtered_points, epsilon=rdp_epsilon)
+
+    # 3. Resample for uniform spacing
+    resampled_points = uniform_resample(
+        simplified_points, spacing=resample_spacing, kind='cubic')
+
+    # 4. Smooth the trajectory
+    smoothed_points = smooth_track(
+        resampled_points, window_length=smooth_window, polyorder=smooth_polyorder)
+
+    return smoothed_points

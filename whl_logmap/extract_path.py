@@ -53,8 +53,11 @@ def get_sorted_records(input_path: str, sort_mode: SortMode) -> List[str]:
         A list of sorted record file paths.
     """
     # Get all files in the directory that contain "record" in their name
-    record_files = [os.path.join(input_path, f) for f in os.listdir(
-        input_path) if "record" in f and os.path.isfile(os.path.join(input_path, f))]
+    if os.path.isfile(input_path):
+        record_files = [input_path]
+    else:
+        record_files = [os.path.join(input_path, f) for f in os.listdir(
+            input_path) if "record" in f and os.path.isfile(os.path.join(input_path, f))]
 
     if sort_mode == SortMode.TIME:
         # Sort files by modification time

@@ -46,9 +46,7 @@ def main(args=None):
     parser.add_argument(
         "--extra_roi_extension", type=float, default=0.3,
         help="Extra ROI extension distance.")
-    parser.add_argument(
-        "-f", "--filter", type=str, default="gaussian_filter",
-        help="Filter method to apply (e.g., gaussian_filter, median_filter, etc.).")
+
     parsed_args = parser.parse_args(args)
 
     input_path = parsed_args.input_path
@@ -74,10 +72,8 @@ def main(args=None):
                 "Could not read any valid path points from the input file.")
             sys.exit(1)
 
-        # Downsample the trajectory for efficiency (taking every 10th point)
-        trajectory = trajectory[::10]
-        filtered_trajectory = preprocess.filter_trajectory(
-            trajectory, filter_type=parsed_args.filter, sigma=1.0)
+        # Sampling and smoothing curves
+        filtered_trajectory = preprocess.optimize_trajectory(trajectory)
         logging.info("Filtered trajectory points.")
 
         plot_output_file = os.path.join(output_path, 'output.png')

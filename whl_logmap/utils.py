@@ -63,7 +63,6 @@ def plot_points(points: np.ndarray, output_file: str = 'map/output.png'):
         points: A list of (x, y) coordinate tuples.
         output_file: The path to save the plot. Defaults to 'map/output.png'.
     """
-    points = np.asarray(points)
     if points.size == 0:
         logging.warning("No points to plot.")
         return
@@ -72,7 +71,7 @@ def plot_points(points: np.ndarray, output_file: str = 'map/output.png'):
     plt.figure(figsize=(8, 8))
 
     # Plot the points as a scatter plot
-    plt.scatter(points[:, 0], points[:, 1])
+    plt.plot(points[:, 0], points[:, 1], '-o', markersize=3)
 
     # Set the labels and title
     plt.xlabel("X Coordinate")

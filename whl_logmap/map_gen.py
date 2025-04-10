@@ -18,7 +18,7 @@
 
 from typing import Tuple
 import math
-import os
+import numpy as np
 
 from modules.map.proto import map_pb2, map_lane_pb2, map_road_pb2, map_geometry_pb2
 from shapely.geometry import LineString, Point
@@ -36,26 +36,19 @@ LANE_SEGMENT_LENGTH = 100  # Estimated length of each lane segment
 
 
 def calculate_offset_points(p1: Point, p2: Point, distance: float) -> Tuple[list[float], list[float]]:
-    """Calculates the left and right offset points relative to a line segment.
+    vector = np.array([p2.x - p1.x, p2.y - p1.y])
+    norm = np.linalg.norm(vector)
+    if norm == 0:
+        return [p1.x, p1.y], [p1.x, p1.y]  # Handle the case where p1 and p2 are the same
 
-    Args:
-        p1: The starting point of the line segment.
-        p2: The ending point of the line segment.
-        distance: The offset distance.
+    unit_vector = vector / norm
+    normal_vector = np.array([-unit_vector[1], unit_vector[0]])  # Left normal
 
-    Returns:
-        A tuple containing the coordinates of the left and right offset points.
-    """
-    delta_y = p2.y - p1.y
-    delta_x = p2.x - p1.x
-    angle = math.atan2(delta_y, delta_x)
-    left_angle = angle + math.pi / 2.0
-    right_angle = angle - math.pi / 2.0
+    left_point = [p1.x + normal_vector[0] * distance,
+                  p1.y + normal_vector[1] * distance]
+    right_point = [p1.x - normal_vector[0] * distance,
+                   p1.y - normal_vector[1] * distance]  # Right normal is the opposite
 
-    left_point = [p1.x + (math.cos(left_angle) * distance),
-                  p1.y + (math.sin(left_angle) * distance)]
-    right_point = [p1.x + (math.cos(right_angle) * distance),
-                   p1.y + (math.sin(right_angle) * distance)]
     return left_point, right_point
 
 
@@ -100,78 +93,11 @@ def create_new_lane(map_object: map_pb2.Map, lane_id: int) -> tuple[map_lane_pb2
     return lane, central, left_boundary, right_boundary
 
 
-def add_lane_points(path: LineString, lane: map_lane_pb2.Lane, central: map_geometry_pb2.CurveSegment,
-                    left_boundary: map_geometry_pb2.CurveSegment, right_boundary: map_geometry_pb2.CurveSegment,
-                    left_edge_segment: map_geometry_pb2.CurveSegment,
-                    right_edge_segment: map_geometry_pb2.CurveSegment, index: int, extra_roi_extension: float):
-    """Adds points to the lane, central line, and boundary lines.
-
-    Args:
-        path: The centerline path of the road.
-        lane: The lane object.
-        central: The central curve segment object.
-        left_boundary: The left boundary curve segment object.
-        right_boundary: The right boundary curve segment object.
-        left_edge_segment: The left road boundary curve segment object.
-        right_edge_segment: The right road boundary curve segment object.
-        index: The current path index being processed.
-    if index >= path.length:
-        print(
-            f"Warning: Index {index} exceeds path length {path.length}. Skipping point addition.")
-        return
-
-    p1 = path.interpolate(index)
-    """
-    p1 = path.interpolate(index)
-    # Use an intermediate point to calculate the offset direction
-    p2 = path.interpolate(index + 0.5)
-    distance = LANE_WIDTH / 2.0
-    left_point, right_point = calculate_offset_points(p1, p2, distance)
-
-    # Add central point
-    central_point = central.line_segment.point.add()
-    central_point.x = p1.x
-    central_point.y = p1.y
-
-    # Add left and right boundary points
-    left_bound_point = left_boundary.line_segment.point.add()
-    left_bound_point.x = left_point[0]
-    left_bound_point.y = left_point[1]
-
-    right_bound_point = right_boundary.line_segment.point.add()
-    right_bound_point.x = right_point[0]
-    right_bound_point.y = right_point[1]
-
-    # Add left and right road boundary points with extra extension
-    edge_distance = distance + extra_roi_extension
-    left_edge_point_offset, right_edge_point_offset = calculate_offset_points(
-        p1, p2, edge_distance)
-
-    left_edge_point = left_edge_segment.line_segment.point.add()
-    left_edge_point.x = left_edge_point_offset[0]
-    left_edge_point.y = left_edge_point_offset[1]
-
-    right_edge_point = right_edge_segment.line_segment.point.add()
-    right_edge_point.x = right_edge_point_offset[0]
-    right_edge_point.y = right_edge_point_offset[1]
-
-    # Add left and right samples
-    left_sample = lane.left_sample.add()
-    # Distance along the current segment
-    left_sample.s = float(index % int(LANE_SEGMENT_LENGTH))
-    left_sample.width = LANE_WIDTH / 2.0
-
-    right_sample = lane.right_sample.add()
-    # Distance along the current segment
-    right_sample.s = float(index % int(LANE_SEGMENT_LENGTH))
-    right_sample.width = LANE_WIDTH / 2.0
-
-
-def initialize_road_section(map_object: map_pb2.Map) -> tuple[map_road_pb2.RoadSection,
-                                                              map_road_pb2.BoundaryEdge,
-                                                              map_geometry_pb2.CurveSegment,
-                                                              map_road_pb2.BoundaryEdge,
-                                                              map_geometry_pb2.CurveSegment]:
+def create_road_section(map_object: map_pb2.Map) -> tuple[map_road_pb2.RoadSection,
+                                                          map_road_pb2.BoundaryEdge,
+                                                          map_geometry_pb2.CurveSegment,
+                                                          map_road_pb2.BoundaryEdge,
+                                                          map_geometry_pb2.CurveSegment]:
     """Initializes road and road section information.
 
     Args:
@@ -197,6 +123,58 @@ def initialize_road_section(map_object: map_pb2.Map) -> tuple[map_road_pb2.RoadS
     return section, left_edge, left_edge_segment, right_edge, right_edge_segment
 
 
+def _add_points_at_index(path: LineString, index: int, central: map_geometry_pb2.CurveSegment,
+                         left_boundary: map_geometry_pb2.CurveSegment, right_boundary: map_geometry_pb2.CurveSegment,
+                         left_edge_segment: map_geometry_pb2.CurveSegment,
+                         right_edge_segment: map_geometry_pb2.CurveSegment, extra_roi_extension: float):
+    if index >= path.length:
+        print(
+            f"Warning: Index {index} exceeds path length {path.length}. Skipping point addition.")
+        return
+
+    p1 = path.interpolate(index)
+    p2 = path.interpolate(index + 0.5)
+    distance = LANE_WIDTH / 2.0
+    left_point, right_point = calculate_offset_points(p1, p2, distance)
+
+    # 添加中心点
+    central_point = central.line_segment.point.add()
+    central_point.x = p1.x
+    central_point.y = p1.y
+
+    # 添加左右边界点
+    left_bound_point = left_boundary.line_segment.point.add()
+    left_bound_point.x = left_point[0]
+    left_bound_point.y = left_point[1]
+
+    right_bound_point = right_boundary.line_segment.point.add()
+    right_bound_point.x = right_point[0]
+    right_bound_point.y = right_point[1]
+
+    # 添加左右道路边界点
+    edge_distance = distance + extra_roi_extension
+    left_edge_point_offset, right_edge_point_offset = calculate_offset_points(
+        p1, p2, edge_distance)
+
+    left_edge_point = left_edge_segment.line_segment.point.add()
+    left_edge_point.x = left_edge_point_offset[0]
+    left_edge_point.y = left_edge_point_offset[1]
+
+    right_edge_point = right_edge_segment.line_segment.point.add()
+    right_edge_point.x = right_edge_point_offset[0]
+    right_edge_point.y = right_edge_point_offset[1]
+
+
+def _add_lane_samples(lane: map_lane_pb2.Lane, index: int):
+    left_sample = lane.left_sample.add()
+    left_sample.s = float(index % int(LANE_SEGMENT_LENGTH))
+    left_sample.width = LANE_WIDTH / 2.0
+
+    right_sample = lane.right_sample.add()
+    right_sample.s = float(index % int(LANE_SEGMENT_LENGTH))
+    right_sample.width = LANE_WIDTH / 2.0
+
+
 def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension: float):
     """Processes the path, creating lane and road structures.
 
@@ -211,7 +189,7 @@ def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension:
         return
     length = int(path.length)
     lane = None
-    section, left_edge, left_edge_segment, right_edge, right_edge_segment = initialize_road_section(
+    section, left_edge, left_edge_segment, right_edge, right_edge_segment = create_road_section(
         map_object)
     lane_id_counter = 0
 
@@ -230,7 +208,7 @@ def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension:
             if i > 0:
                 lane.predecessor_id.add().id = str(lane_id_counter - 1)
 
-                # Add the first point, aligned with the last point of the previous lane
+                # Add the first point of the new lane
                 prev_p = path.interpolate(i - 1)
                 prev_p2 = path.interpolate(i - 1 + 0.5)
                 distance = LANE_WIDTH / 2.0
@@ -257,16 +235,12 @@ def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension:
                 right_edge_point.y = rp_edge[1]
                 right_edge_point.x = rp_edge[0]
 
-                left_sample = lane.left_sample.add()
-                left_sample.s = 0.0
-                left_sample.width = LANE_WIDTH / 2.0
+                # For the first point of the new lane
+                _add_lane_samples(lane, 0)
 
-                right_sample = lane.right_sample.add()
-                right_sample.s = 0.0
-                right_sample.width = LANE_WIDTH / 2.0
-
-        add_lane_points(path, lane, central, left_boundary, right_boundary,
-                        left_edge_segment, right_edge_segment, i, extra_roi_extension)
+        _add_points_at_index(path, i, central, left_boundary, right_boundary,
+                             left_edge_segment, right_edge_segment, extra_roi_extension)
+        _add_lane_samples(lane, i)
         central_points_count += 1
 
     if lane is not None:
