@@ -243,9 +243,9 @@ def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension:
         _add_lane_samples(lane, i)
         central_points_count += 1
 
-    if lane is not None:
-        lane.length = central_points_count * 1.0  # Update the length of the last lane
-        lane.left_boundary.length = lane.length
-        lane.right_boundary.length = lane.length
-        # TODO(zero): Use segment[0], Need to ensure that there is only one segment
-        lane.central_curve.segment[0].length = lane.length
+        if lane is not None:
+            lane.length = central_points_count * 1.0  # Update the length of the last lane
+            lane.left_boundary.length = lane.length
+            lane.right_boundary.length = lane.length
+            # TODO(zero): Use segment[0], Need to ensure that there is only one segment
+            lane.central_curve.segment[0].length = lane.length
