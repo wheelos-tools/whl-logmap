@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "whl-logmap"
-version = "0.0.3"
+version = "0.0.4"
 description = "wheelos map tool"
 readme = "README.md"
 authors = [
@@ -30,7 +30,7 @@ dependencies = [
 keywords = ["logmap", "wheelos", "gis", "mapping"]
 
 [project.scripts]
-whl_logmap = "whl_logmap.main:main"
+whl-logmap = "whl_logmap.main:main"
 
 [tool.setuptools]
 package-dir = { "" = "." }
