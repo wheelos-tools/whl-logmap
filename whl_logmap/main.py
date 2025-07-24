@@ -55,7 +55,7 @@ def main(args=None):
 
     try:
         logging.info(f"Processing input path: {input_path}")
-        record_files = get_sorted_records(input_path, sort_mode=SortMode.TIME)
+        record_files = get_sorted_records(input_path, sort_mode=SortMode.NAME)
 
         if not os.path.exists(output_path):
             logging.info(

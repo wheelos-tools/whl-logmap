@@ -37,7 +37,6 @@ class SortMode(Enum):
     Args:
         Enum (_type_): Enumeration for sorting modes.
     """
-    TIME = 0  # Sort by file modification time
     NAME = 1  # Sort by file name
 
 
@@ -59,10 +58,7 @@ def get_sorted_records(input_path: str, sort_mode: SortMode) -> List[str]:
         record_files = [os.path.join(input_path, f) for f in os.listdir(
             input_path) if "record" in f and os.path.isfile(os.path.join(input_path, f))]
 
-    if sort_mode == SortMode.TIME:
-        # Sort files by modification time
-        record_files.sort(key=lambda file_path: os.path.getmtime(file_path))
-    elif sort_mode == SortMode.NAME:
+    if sort_mode == SortMode.NAME:
         # Sort files by name
         record_files.sort()
     return record_files
