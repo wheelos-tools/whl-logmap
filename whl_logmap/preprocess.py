@@ -161,7 +161,7 @@ def smooth_track(points, window_length=5, polyorder=3):
 def optimize_trajectory(raw_points,
                         kernel_size=3,
                         threshold_factor=3.0,
-                        rdp_epsilon=0.1,
+                        rdp_epsilon=0.05,
                         resample_spacing=1.0,
                         smooth_window=5,
                         smooth_polyorder=3):
@@ -190,7 +190,7 @@ def optimize_trajectory(raw_points,
 
     # 3. Resample for uniform spacing
     resampled_points = uniform_resample(
-        simplified_points, spacing=resample_spacing, kind='cubic')
+        simplified_points, spacing=resample_spacing, kind='linear')
 
     # 4. Smooth the trajectory
     smoothed_points = smooth_track(
