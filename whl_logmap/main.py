@@ -46,27 +46,33 @@ def main(args=None):
     parser.add_argument(
         "--extra_roi_extension", type=float, default=0.3,
         help="Extra ROI extension distance.")
+    parser.add_argument(
+        "--force", action="store_true",
+        help="Force regeneration of path.txt even if it already exists.")
 
     parsed_args = parser.parse_args(args)
 
     input_path = parsed_args.input_path
     output_path = parsed_args.output_path
     extra_roi_extension = parsed_args.extra_roi_extension
+    force = parsed_args.force
 
     try:
         logging.info(f"Processing input path: {input_path}")
         record_files = get_sorted_records(input_path, sort_mode=SortMode.NAME)
 
         if not os.path.exists(output_path):
-            logging.info(
-                f"Output path '{output_path}' not exists. Createing it.")
+            logging.info(f"Output path '{output_path}' not exists. Creating it.")
             os.makedirs(output_path, exist_ok=True)
 
-        output_path_file = os.path.join(output_path, "path.txt")
-        logging.info(f"Extracting path to: {output_path_file}")
-        extract_path(record_files, output_path_file)
+        output_file = os.path.join(output_path, "path.txt")
+        if not force and os.path.exists(output_file):
+            logging.info(f"path.txt already exists at '{output_file}', skipping extraction.")
+        else:
+            logging.info(f"Extracting path to: {output_file}")
+            extract_path(record_files, output_file)
 
-        trajectory = utils.read_points_from_file(output_path_file)
+        trajectory = utils.read_points_from_file(output_file)
         if trajectory.size == 0:
             logging.error(
                 "Could not read any valid path points from the input file.")

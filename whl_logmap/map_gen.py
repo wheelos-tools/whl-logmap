@@ -17,14 +17,13 @@
 ###############################################################################
 
 from typing import Tuple
-import math
 import numpy as np
 
 from modules.map.proto import map_pb2, map_lane_pb2, map_road_pb2, map_geometry_pb2
 from shapely.geometry import LineString, Point
 from google.protobuf import text_format
 
-LANE_WIDTH = 3.3
+LANE_WIDTH = 3.75
 DEFAULT_SPEED_LIMIT = 20.0
 DEFAULT_LANE_TYPE = map_lane_pb2.Lane.CITY_DRIVING
 DEFAULT_LANE_DIRECTION = map_lane_pb2.Lane.FORWARD
