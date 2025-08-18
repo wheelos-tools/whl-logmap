@@ -38,7 +38,8 @@ def calculate_offset_points(p1: Point, p2: Point, distance: float) -> Tuple[list
     vector = np.array([p2.x - p1.x, p2.y - p1.y])
     norm = np.linalg.norm(vector)
     if norm == 0:
-        return [p1.x, p1.y], [p1.x, p1.y]  # Handle the case where p1 and p2 are the same
+        # Handle the case where p1 and p2 are the same
+        return [p1.x, p1.y], [p1.x, p1.y]
 
     unit_vector = vector / norm
     normal_vector = np.array([-unit_vector[1], unit_vector[0]])  # Left normal
@@ -174,7 +175,23 @@ def _add_lane_samples(lane: map_lane_pb2.Lane, index: int):
     right_sample.width = LANE_WIDTH / 2.0
 
 
-def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension: float):
+def check_loopback(first_lane: map_lane_pb2.Lane, current_lane: map_lane_pb2.Lane, detection_threshold=1.0) -> bool:
+    if first_lane is None or current_lane is None:
+        return False
+    if int(current_lane.id.id) < 2:
+        return False
+
+    # Use first_lane point[2], because we need the paths partially overlap
+    start_point = first_lane.central_curve.segment[0].point[2]
+    end_point = current_lane.central_curve.segment[0].point[-1]
+    dist = np.sqrt((start_point.x - end_point.x)**2 +
+                   (start_point.y - end_point.y)**2)
+    if dist < detection_threshold:
+        return True
+    return False
+
+
+def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension: float, enable_loopback: bool = True):
     """Processes the path, creating lane and road structures.
 
     Args:
@@ -191,6 +208,7 @@ def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension:
     section, left_edge, left_edge_segment, right_edge, right_edge_segment = create_road_section(
         map_object)
     lane_id_counter = 0
+    first_lane = None
 
     for i in range(length):
         if i % int(LANE_SEGMENT_LENGTH) == 0:
@@ -201,6 +219,9 @@ def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension:
 
             lane, central, left_boundary, right_boundary = create_new_lane(
                 map_object, lane_id_counter)
+            if first_lane is None:
+                first_lane = lane
+
             section.lane_id.add().id = str(lane_id_counter)
             central_points_count = 0  # Reset counter for the new lane
 
@@ -248,3 +269,8 @@ def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension:
             lane.right_boundary.length = lane.length
             # TODO(zero): Use segment[0], Need to ensure that there is only one segment
             lane.central_curve.segment[0].length = lane.length
+
+        if enable_loopback and check_loopback(first_lane, lane):
+            lane.successor_id.add().id = first_lane.id.id
+            first_lane.predecessor_id.add().id = lane.id.id
+            break
