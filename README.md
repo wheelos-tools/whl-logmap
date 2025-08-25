@@ -9,18 +9,21 @@ pip3 install whl_logmap
 ```
 
 ## Quick Start
+
 1. Start the GPS/transform/localization module and record the vehicle's trajectory
+
 ```bash
 cyber_recorder record -c /apollo/localization/pose
 ```
+
 2. Generate base_map from records
 
 ```bash
-whl_logmap --i=your_record_dir
+whl-logmap --i=your_record_dir
 
 // or
 
-whl_logmap --i=your_record_file
+whl-logmap --i=your_record_file
 ```
 
 ## Options
