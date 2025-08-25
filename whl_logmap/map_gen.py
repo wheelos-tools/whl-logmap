@@ -16,7 +16,7 @@
 # limitations under the License.
 ###############################################################################
 
-from typing import Tuple
+from typing import List, Tuple
 import numpy as np
 
 from modules.map.proto import map_pb2, map_lane_pb2, map_road_pb2, map_geometry_pb2
@@ -34,7 +34,7 @@ SECTION_ID = "2"
 LANE_SEGMENT_LENGTH = 100  # Estimated length of each lane segment
 
 
-def calculate_offset_points(p1: Point, p2: Point, distance: float) -> Tuple[list[float], list[float]]:
+def calculate_offset_points(p1: Point, p2: Point, distance: float) -> Tuple[List[float], List[float]]:
     vector = np.array([p2.x - p1.x, p2.y - p1.y])
     norm = np.linalg.norm(vector)
     if norm == 0:
@@ -52,7 +52,7 @@ def calculate_offset_points(p1: Point, p2: Point, distance: float) -> Tuple[list
     return left_point, right_point
 
 
-def create_new_lane(map_object: map_pb2.Map, lane_id: int) -> tuple[map_lane_pb2.Lane,
+def create_new_lane(map_object: map_pb2.Map, lane_id: int) -> Tuple[map_lane_pb2.Lane,
                                                                     map_geometry_pb2.CurveSegment,
                                                                     map_geometry_pb2.CurveSegment,
                                                                     map_geometry_pb2.CurveSegment]:
@@ -93,7 +93,7 @@ def create_new_lane(map_object: map_pb2.Map, lane_id: int) -> tuple[map_lane_pb2
     return lane, central, left_boundary, right_boundary
 
 
-def create_road_section(map_object: map_pb2.Map) -> tuple[map_road_pb2.RoadSection,
+def create_road_section(map_object: map_pb2.Map) -> Tuple[map_road_pb2.RoadSection,
                                                           map_road_pb2.BoundaryEdge,
                                                           map_geometry_pb2.CurveSegment,
                                                           map_road_pb2.BoundaryEdge,
