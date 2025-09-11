@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+"""Main module for generating map data from path files.
+
+This module provides the main entry point for processing trajectory data
+and generating map files with optional curvature constraints.
+"""
 
 # Copyright 2025 daohu527 <daohu527@gmail.com>
 #
@@ -19,14 +24,14 @@ import os
 import sys
 import argparse
 import logging
+import numpy as np
 
 from modules.map.proto import map_pb2
 from shapely.geometry import LineString
 
+from whl_logmap import plots
 from whl_logmap.extract_path import SortMode, extract_path, get_sorted_records
-import whl_logmap.map_gen as map_gen
-import whl_logmap.utils as utils
-import whl_logmap.preprocess as preprocess
+from whl_logmap import map_gen, utils, preprocess
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -52,6 +57,21 @@ def main(args=None):
     parser.add_argument(
         "--force", action="store_true",
         help="Force regeneration of path.txt even if it already exists.")
+    parser.add_argument(
+        "--max_curvature",
+        type=float,
+        default=None,
+        help="Maximum allowed curvature (default: None, no curvature constraint). "
+        "Recommended values: 95% of vehicle limit.",
+    )
+    parser.add_argument(
+        "--curvature_method",
+        type=str,
+        default="strict",
+        choices=["adaptive", "iterative", "strict"],
+        help="Curvature constraint method (default: strict, only used when "
+        "--max_curvature is specified). Available methods: adaptive, iterative, strict",
+    )
 
     parsed_args = parser.parse_args(args)
 
@@ -60,6 +80,8 @@ def main(args=None):
     extra_roi_extension = parsed_args.extra_roi_extension
     force = parsed_args.force
     enable_loopback = parsed_args.enable_loopback
+    max_curvature = parsed_args.max_curvature
+    curvature_method = parsed_args.curvature_method
 
     try:
         logging.info(f"Processing input path: {input_path}")
@@ -84,9 +106,19 @@ def main(args=None):
                 "Could not read any valid path points from the input file.")
             sys.exit(1)
 
-        # Sampling and smoothing curves
-        filtered_trajectory = preprocess.optimize_trajectory(trajectory)
-        logging.info("Filtered trajectory points.")
+        # Sampling and smoothing curves with optional curvature constraint
+        filtered_trajectory = preprocess.optimize_trajectory(
+            trajectory,
+            kernel_size=3,
+            threshold_factor=3.0,
+            rdp_epsilon=0.01,
+            resample_spacing=0.5,
+            smooth_window=10,
+            smooth_polyorder=3,
+            max_curvature=max_curvature,
+            curvature_constraint_method=curvature_method,
+        )
+        logging.info("Filtered trajectory points without curvature constraint.")
 
         plot_output_file = os.path.join(output_path, 'output.png')
         logging.info(f"Plotting path points to {plot_output_file}")
@@ -102,6 +134,43 @@ def main(args=None):
         utils.save_map_to_file(map_data, output_path)
         print("Map data generation complete.")
 
+        # ================================================
+        # Plot and analyze the trajectory
+        # ================================================
+
+        # Plot original trajectory
+        plot_output_file = os.path.join(output_path, "output.png")
+        logging.info(f"Plotting path points to {plot_output_file}")
+        plots.plot_points(filtered_trajectory, plot_output_file)
+
+        # Analyze and plot curvature statistics
+        if max_curvature is not None:
+            logging.info("Analyzing trajectory curvature...")
+            curvature_stats = plots.plot_curvature_analysis(
+                filtered_trajectory, output_path, "Processed"
+            )
+
+            # Print summary
+            print("\n=== Processing Summary ===")
+            print(f"Original points: {len(trajectory)}")
+            print(f"Processed points: {len(filtered_trajectory)}")
+            print(f"Reduction ratio: {len(filtered_trajectory)/len(trajectory)*100:.2f}%")
+            print(f"Max curvature after processing: {curvature_stats['max_curvature']:.6f}")
+            print(f"Curvature constraint: {max_curvature:.3f} (method: {curvature_method})")
+            if curvature_stats["max_curvature"] <= max_curvature:
+                print(f"✓ Curvature constraint satisfied (≤ {max_curvature:.3f})")
+            else:
+                print(f"⚠ Curvature constraint violated (> {max_curvature:.3f})")
+                violations = np.sum(curvature_stats["max_curvature"] > max_curvature)
+                violation_percentage = violations/curvature_stats['total_points']*100
+                print(f"  Violations: {violations} points ({violation_percentage:.2f}%)")
+        else:
+            # Print basic summary without curvature analysis
+            print("\n=== Processing Summary ===")
+            print(f"Original points: {len(trajectory)}")
+            print(f"Processed points: {len(filtered_trajectory)}")
+            print(f"Reduction ratio: {len(filtered_trajectory)/len(trajectory)*100:.2f}%")
+            print("Curvature constraint: Not applied (use --max_curvature to enable)")
     except FileNotFoundError:
         logging.error(f"Input file not found at '{input_path}'.")
         sys.exit(1)
