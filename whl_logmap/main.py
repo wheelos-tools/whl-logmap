@@ -122,7 +122,7 @@ def main(args=None):
 
         plot_output_file = os.path.join(output_path, 'output.png')
         logging.info(f"Plotting path points to {plot_output_file}")
-        utils.plot_points(filtered_trajectory, plot_output_file)
+        plots.plot_points(filtered_trajectory, plot_output_file)
 
         map_data = map_pb2.Map()
         path = LineString(filtered_trajectory)
