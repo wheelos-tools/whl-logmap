@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+"""Utility functions module.
+
+This module provides utility functions for file I/O operations,
+map data handling, and other common operations.
+"""
 
 # Copyright 2025 daohu527 <daohu527@gmail.com>
 #
@@ -15,10 +20,9 @@
 # limitations under the License.
 
 
-import numpy as np
 import os
-import matplotlib.pyplot as plt
-import logging
+
+import numpy as np
 
 from modules.map.proto import map_pb2
 from google.protobuf import text_format
@@ -53,37 +57,4 @@ def save_map_to_file(map_object: map_pb2.Map, output_filepath: str):
     bin_filepath = os.path.join(output_filepath, "base_map.bin")
     with open(bin_filepath, 'wb') as f_bin:
         f_bin.write(map_object.SerializeToString())
-        print(f"Map text format saved to: {bin_filepath}")
-
-
-def plot_points(points: np.ndarray, output_file: str = 'map/output.png'):
-    """Plots a list of (x, y) points using matplotlib.
-
-    Args:
-        points: A list of (x, y) coordinate tuples.
-        output_file: The path to save the plot. Defaults to 'map/output.png'.
-    """
-    if points.size == 0:
-        logging.warning("No points to plot.")
-        return
-
-    # Create a square figure (same width and height)
-    plt.figure(figsize=(8, 8))
-
-    # Plot the points as a scatter plot
-    plt.plot(points[:, 0], points[:, 1], '-o', markersize=3)
-
-    # Set the labels and title
-    plt.xlabel("X Coordinate")
-    plt.ylabel("Y Coordinate")
-    plt.title("Path Points")
-
-    # Ensure equal scaling on both axes
-    plt.axis('equal')
-
-    # Add grid
-    plt.grid(True)
-
-    # Save the plot as a square image
-    plt.savefig(output_file, dpi=300, bbox_inches='tight')
-    plt.close()
+        print(f"Map binary format saved to: {bin_filepath}")
