@@ -21,9 +21,10 @@ and curvature constraint application.
 # limitations under the License.
 
 import numpy as np
-from funcs import calculate_curvature
 from scipy.interpolate import interp1d
 from scipy.signal import medfilt, savgol_filter
+
+from .funcs import calculate_curvature
 
 # ==============================
 # 1. Outlier Filtering: Median Filter
