@@ -143,18 +143,18 @@ def main(args=None):
         logging.info(f"Plotting path points to {plot_output_file}")
         plots.plot_points(filtered_trajectory, plot_output_file)
 
+        # Print summary
+        print("\n=== Processing Summary ===")
+        print(f"Original points: {len(trajectory)}")
+        print(f"Processed points: {len(filtered_trajectory)}")
+        print(f"Reduction ratio: {len(filtered_trajectory)/len(trajectory)*100:.2f}%")
+
         # Analyze and plot curvature statistics
         if max_curvature is not None:
-            logging.info("Analyzing trajectory curvature...")
             curvature_stats = plots.plot_curvature_analysis(
                 filtered_trajectory, output_path, "Processed"
             )
 
-            # Print summary
-            print("\n=== Processing Summary ===")
-            print(f"Original points: {len(trajectory)}")
-            print(f"Processed points: {len(filtered_trajectory)}")
-            print(f"Reduction ratio: {len(filtered_trajectory)/len(trajectory)*100:.2f}%")
             print(f"Max curvature after processing: {curvature_stats['max_curvature']:.6f}")
             print(f"Curvature constraint: {max_curvature:.3f} (method: {curvature_method})")
             if curvature_stats["max_curvature"] <= max_curvature:
@@ -164,13 +164,7 @@ def main(args=None):
                 violations = np.sum(curvature_stats["max_curvature"] > max_curvature)
                 violation_percentage = violations/curvature_stats['total_points']*100
                 print(f"  Violations: {violations} points ({violation_percentage:.2f}%)")
-        else:
-            # Print basic summary without curvature analysis
-            print("\n=== Processing Summary ===")
-            print(f"Original points: {len(trajectory)}")
-            print(f"Processed points: {len(filtered_trajectory)}")
-            print(f"Reduction ratio: {len(filtered_trajectory)/len(trajectory)*100:.2f}%")
-            print("Curvature constraint: Not applied (use --max_curvature to enable)")
+
     except FileNotFoundError:
         logging.error(f"Input file not found at '{input_path}'.")
         sys.exit(1)
