@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 
 
-def plot_curvature_analysis(points, output_path, title_prefix="Processed"):
+def plot_curvature_analysis(points, output_path, title_prefix="Processed", max_curvature=None):
     """
     Plot curvature analysis and statistics for trajectory points.
 
@@ -27,50 +27,65 @@ def plot_curvature_analysis(points, output_path, title_prefix="Processed"):
         points: numpy array of shape (n, 2) containing (x, y) coordinates
         output_path: directory to save the plots
         title_prefix: prefix for plot titles
+        max_curvature: maximum curvature threshold for dynamic threshold calculation
     """
     if len(points) < 3:
         logging.warning("Not enough points for curvature analysis")
         return
 
     # Calculate curvature
-
     curvature = calculate_curvature(points)
 
     # Calculate statistics
-    max_curvature = np.max(curvature)
+    actual_max_curvature = np.max(curvature)
     min_curvature = np.min(curvature)
     mean_curvature = np.mean(curvature)
     std_curvature = np.std(curvature)
     median_curvature = np.median(curvature)
 
+    # Dynamic threshold calculation based on max_curvature parameter
+    if max_curvature is not None:
+        # Use the provided max_curvature as the highest threshold
+        # Calculate other thresholds as percentages of max_curvature
+        threshold_1 = max_curvature * 0.5   # 50% of max
+        threshold_2 = max_curvature * 0.75  # 75% of max
+        threshold_3 = max_curvature * 0.95  # 95% of max
+        threshold_4 = max_curvature         # 100% of max (actual constraint)
+    else:
+        # Fallback to default thresholds if max_curvature not provided
+        threshold_1 = 0.1
+        threshold_2 = 0.15
+        threshold_3 = 0.19
+        threshold_4 = 0.2
+
     # Count violations of different thresholds
-    violations_0_1 = np.sum(curvature > 0.1)
-    violations_0_15 = np.sum(curvature > 0.15)
-    violations_0_2 = np.sum(curvature > 0.2)
-    violations_0_19 = np.sum(curvature > 0.19)
+    violations_1 = np.sum(curvature > threshold_1)
+    violations_2 = np.sum(curvature > threshold_2)
+    violations_3 = np.sum(curvature > threshold_3)
+    violations_4 = np.sum(curvature > threshold_4)
 
     total_points = len(curvature)
 
     # Print statistics
     print(f"\n=== {title_prefix} Trajectory Curvature Statistics ===")
     print(f"Total points: {total_points}")
-    print(f"Max curvature: {max_curvature:.6f}")
+    print(f"Max curvature: {actual_max_curvature:.6f}")
     print(f"Min curvature: {min_curvature:.6f}")
     print(f"Mean curvature: {mean_curvature:.6f}")
     print(f"Std curvature: {std_curvature:.6f}")
     print(f"Median curvature: {median_curvature:.6f}")
     print("\nCurvature violations:")
     print(
-        f"  > 0.1:  {violations_0_1:4d} points ({violations_0_1/total_points*100:.2f}%)"
+        f"  > {threshold_1:.3f}: {violations_1:4d} points ({violations_1/total_points*100:.2f}%)"
     )
     print(
-        f"  > 0.15: {violations_0_15:4d} points ({violations_0_15/total_points*100:.2f}%)"
+        f"  > {threshold_2:.3f}: {violations_2:4d} points ({violations_2/total_points*100:.2f}%)"
     )
     print(
-        f"  > 0.19: {violations_0_19:4d} points ({violations_0_19/total_points*100:.2f}%)"
+        f"  > {threshold_3:.3f}: {violations_3:4d} points ({violations_3/total_points*100:.2f}%)"
     )
     print(
-        f"  > 0.2:  {violations_0_2:4d} points ({violations_0_2/total_points*100:.2f}%)"
+        f"  > {threshold_4:.3f}: {violations_4:4d} points ({violations_4/total_points*100:.2f}%)"
     )
 
     # Create plots
@@ -88,14 +103,14 @@ def plot_curvature_analysis(points, output_path, title_prefix="Processed"):
     # Plot 2: Curvature vs Point Index
     point_indices = np.arange(len(curvature))
     ax2.plot(point_indices, curvature, "r-", linewidth=1)
-    ax2.axhline(y=0.1, color="orange", linestyle="--", alpha=0.7, label="0.1 threshold")
+    ax2.axhline(y=threshold_1, color="orange", linestyle="--", alpha=0.7, label=f"{threshold_1:.3f} threshold")
     ax2.axhline(
-        y=0.15, color="yellow", linestyle="--", alpha=0.7, label="0.15 threshold"
+        y=threshold_2, color="yellow", linestyle="--", alpha=0.7, label=f"{threshold_2:.3f} threshold"
     )
     ax2.axhline(
-        y=0.19, color="green", linestyle="--", alpha=0.7, label="0.19 threshold"
+        y=threshold_3, color="green", linestyle="--", alpha=0.7, label=f"{threshold_3:.3f} threshold"
     )
-    ax2.axhline(y=0.2, color="red", linestyle="--", alpha=0.7, label="0.2 threshold")
+    ax2.axhline(y=threshold_4, color="red", linestyle="--", alpha=0.7, label=f"{threshold_4:.3f} threshold")
     ax2.set_title(f"{title_prefix} Curvature vs Point Index")
     ax2.set_xlabel("Point Index")
     ax2.set_ylabel("Curvature")
@@ -104,14 +119,14 @@ def plot_curvature_analysis(points, output_path, title_prefix="Processed"):
 
     # Plot 3: Curvature Histogram
     ax3.hist(curvature, bins=50, alpha=0.7, color="skyblue", edgecolor="black")
-    ax3.axvline(x=0.1, color="orange", linestyle="--", alpha=0.7, label="0.1 threshold")
+    ax3.axvline(x=threshold_1, color="orange", linestyle="--", alpha=0.7, label=f"{threshold_1:.3f} threshold")
     ax3.axvline(
-        x=0.15, color="yellow", linestyle="--", alpha=0.7, label="0.15 threshold"
+        x=threshold_2, color="yellow", linestyle="--", alpha=0.7, label=f"{threshold_2:.3f} threshold"
     )
     ax3.axvline(
-        x=0.19, color="green", linestyle="--", alpha=0.7, label="0.19 threshold"
+        x=threshold_3, color="green", linestyle="--", alpha=0.7, label=f"{threshold_3:.3f} threshold"
     )
-    ax3.axvline(x=0.2, color="red", linestyle="--", alpha=0.7, label="0.2 threshold")
+    ax3.axvline(x=threshold_4, color="red", linestyle="--", alpha=0.7, label=f"{threshold_4:.3f} threshold")
     ax3.set_title(f"{title_prefix} Curvature Distribution")
     ax3.set_xlabel("Curvature")
     ax3.set_ylabel("Frequency")
@@ -122,14 +137,14 @@ def plot_curvature_analysis(points, output_path, title_prefix="Processed"):
     sorted_curvature = np.sort(curvature)
     cumulative_prob = np.arange(1, len(sorted_curvature) + 1) / len(sorted_curvature)
     ax4.plot(sorted_curvature, cumulative_prob, "b-", linewidth=2)
-    ax4.axvline(x=0.1, color="orange", linestyle="--", alpha=0.7, label="0.1 threshold")
+    ax4.axvline(x=threshold_1, color="orange", linestyle="--", alpha=0.7, label=f"{threshold_1:.3f} threshold")
     ax4.axvline(
-        x=0.15, color="yellow", linestyle="--", alpha=0.7, label="0.15 threshold"
+        x=threshold_2, color="yellow", linestyle="--", alpha=0.7, label=f"{threshold_2:.3f} threshold"
     )
     ax4.axvline(
-        x=0.19, color="green", linestyle="--", alpha=0.7, label="0.19 threshold"
+        x=threshold_3, color="green", linestyle="--", alpha=0.7, label=f"{threshold_3:.3f} threshold"
     )
-    ax4.axvline(x=0.2, color="red", linestyle="--", alpha=0.7, label="0.2 threshold")
+    ax4.axvline(x=threshold_4, color="red", linestyle="--", alpha=0.7, label=f"{threshold_4:.3f} threshold")
     ax4.set_title(f"{title_prefix} Curvature Cumulative Distribution")
     ax4.set_xlabel("Curvature")
     ax4.set_ylabel("Cumulative Probability")
@@ -148,15 +163,19 @@ def plot_curvature_analysis(points, output_path, title_prefix="Processed"):
     logging.info(f"Curvature analysis plot saved to: {curvature_plot_file}")
 
     return {
-        "max_curvature": max_curvature,
+        "max_curvature": actual_max_curvature,
         "min_curvature": min_curvature,
         "mean_curvature": mean_curvature,
         "std_curvature": std_curvature,
         "median_curvature": median_curvature,
-        "violations_0_1": violations_0_1,
-        "violations_0_15": violations_0_15,
-        "violations_0_19": violations_0_19,
-        "violations_0_2": violations_0_2,
+        "violations_threshold_1": violations_1,
+        "violations_threshold_2": violations_2,
+        "violations_threshold_3": violations_3,
+        "violations_threshold_4": violations_4,
+        "threshold_1": threshold_1,
+        "threshold_2": threshold_2,
+        "threshold_3": threshold_3,
+        "threshold_4": threshold_4,
         "total_points": total_points,
     }
 

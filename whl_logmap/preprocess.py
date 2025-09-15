@@ -20,12 +20,10 @@ and curvature constraint application.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import numpy as np
-from scipy.interpolate import interp1d
-from scipy.signal import savgol_filter, medfilt
-
 from funcs import calculate_curvature
+from scipy.interpolate import interp1d
+from scipy.signal import medfilt, savgol_filter
 
 # ==============================
 # 1. Outlier Filtering: Median Filter
@@ -96,7 +94,7 @@ def rdp(points, epsilon):
 
     if max_dist > epsilon:
         # Recursively simplify the two segments
-        first_half = rdp(points[:idx+1], epsilon)
+        first_half = rdp(points[: idx + 1], epsilon)
         second_half = rdp(points[idx:], epsilon)
         # Combine the results (avoid duplicating the middle point)
         return np.vstack((first_half[:-1], second_half))
@@ -170,7 +168,9 @@ def smooth_track(points, window_length=5, polyorder=3):
 # =====================================================
 
 
-def apply_curvature_constraint(points, max_curvature=0.2, smoothing_factor=0.3):
+def apply_curvature_constraint(
+    points, max_curvature=0.2, smoothing_factor=0.3, max_iterations=100
+):
     """
     Apply iterative curvature constraint using adaptive smoothing.
 
@@ -209,6 +209,7 @@ def apply_curvature_constraint(points, max_curvature=0.2, smoothing_factor=0.3):
         points: (N,2) array of trajectory points
         max_curvature: maximum allowed curvature (κ_max)
         smoothing_factor: base smoothing intensity (0-1)
+        max_iterations: maximum number of iterations
 
     Returns:
         Curvature-constrained trajectory points
@@ -221,7 +222,6 @@ def apply_curvature_constraint(points, max_curvature=0.2, smoothing_factor=0.3):
 
     # Use while loop with maximum iterations
     iteration = 0
-    max_iterations = 100
 
     while iteration < max_iterations:
         current_curvature = calculate_curvature(constrained_points)
@@ -262,7 +262,9 @@ def apply_curvature_constraint(points, max_curvature=0.2, smoothing_factor=0.3):
     return constrained_points
 
 
-def adaptive_curvature_constraint(points, max_curvature=0.2, window_size=7):
+def adaptive_curvature_constraint(
+    points, max_curvature=0.2, window_size=7, max_iterations=100
+):
     """
     Apply adaptive curvature constraint using Savitzky-Golay filtering.
 
@@ -305,6 +307,7 @@ def adaptive_curvature_constraint(points, max_curvature=0.2, window_size=7):
         points: (N,2) array of trajectory points
         max_curvature: maximum allowed curvature (κ_max)
         window_size: size of smoothing window for high-curvature regions
+        max_iterations: maximum number of iterations
 
     Returns:
         Curvature-constrained trajectory points
@@ -316,7 +319,6 @@ def adaptive_curvature_constraint(points, max_curvature=0.2, window_size=7):
 
     # Use while loop with maximum iterations
     iteration = 0
-    max_iterations = 100
 
     while iteration < max_iterations:
         curvature = calculate_curvature(constrained_points)
@@ -493,6 +495,7 @@ def optimize_trajectory(
     smooth_polyorder=3,
     max_curvature=None,
     curvature_constraint_method="adaptive",
+    max_iterations=100,
 ):
     """
     Given raw trajectory points, perform the following:
@@ -510,6 +513,7 @@ def optimize_trajectory(
       max_curvature: maximum allowed curvature
       curvature_constraint_method: method for applying curvature constraint
                                   ('adaptive', 'iterative', 'strict')
+      max_iterations: maximum number of iterations for curvature constraint
 
     Returns:
       Optimized trajectory points
@@ -534,15 +538,21 @@ def optimize_trajectory(
     if max_curvature is not None:
         if curvature_constraint_method == "adaptive":
             final_points = adaptive_curvature_constraint(
-                smoothed_points, max_curvature=max_curvature
+                smoothed_points,
+                max_curvature=max_curvature,
+                max_iterations=max_iterations,
             )
         elif curvature_constraint_method == "iterative":
             final_points = apply_curvature_constraint(
-                smoothed_points, max_curvature=max_curvature
+                smoothed_points,
+                max_curvature=max_curvature,
+                max_iterations=max_iterations,
             )
         elif curvature_constraint_method == "strict":
             final_points = strict_curvature_constraint(
-                smoothed_points, max_curvature=max_curvature
+                smoothed_points,
+                max_curvature=max_curvature,
+                max_iterations=max_iterations,
             )
         else:
             raise ValueError(
