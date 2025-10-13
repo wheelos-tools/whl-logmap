@@ -10,6 +10,8 @@ pip3 install whl_logmap
 
 ## Quick Start
 
+### Generate from record
+
 1. Start the GPS/transform/localization module and record the vehicle's trajectory
 
 ```bash
@@ -24,6 +26,15 @@ whl-logmap --i=your_record_dir
 // or
 
 whl-logmap --i=your_record_file
+```
+
+### Generate form x,y,heading
+
+1. Generate base_map from x,y,heading
+
+```bash
+# x,y,heading[,forward,backward,spacing]
+whl-logmap --path_params "221247.67,2517672.17,90.0"
 ```
 
 ## Options
