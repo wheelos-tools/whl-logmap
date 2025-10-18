@@ -1,4 +1,19 @@
 #!/usr/bin/env python
+
+# Copyright 2025 daohu527 <daohu527@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Plotting and visualization module.
 
 This module provides functionality for plotting trajectory data,
@@ -19,7 +34,9 @@ logging.basicConfig(
 )
 
 
-def plot_curvature_analysis(points, output_path, title_prefix="Processed", max_curvature=None):
+def plot_curvature_analysis(
+    points, output_path, title_prefix="Processed", max_curvature=None
+):
     """
     Plot curvature analysis and statistics for trajectory points.
 
@@ -47,10 +64,10 @@ def plot_curvature_analysis(points, output_path, title_prefix="Processed", max_c
     if max_curvature is not None:
         # Use the provided max_curvature as the highest threshold
         # Calculate other thresholds as percentages of max_curvature
-        threshold_1 = max_curvature * 0.5   # 50% of max
+        threshold_1 = max_curvature * 0.5  # 50% of max
         threshold_2 = max_curvature * 0.75  # 75% of max
         threshold_3 = max_curvature * 0.95  # 95% of max
-        threshold_4 = max_curvature         # 100% of max (actual constraint)
+        threshold_4 = max_curvature  # 100% of max (actual constraint)
     else:
         # Fallback to default thresholds if max_curvature not provided
         threshold_1 = 0.1
@@ -103,14 +120,34 @@ def plot_curvature_analysis(points, output_path, title_prefix="Processed", max_c
     # Plot 2: Curvature vs Point Index
     point_indices = np.arange(len(curvature))
     ax2.plot(point_indices, curvature, "r-", linewidth=1)
-    ax2.axhline(y=threshold_1, color="orange", linestyle="--", alpha=0.7, label=f"{threshold_1:.3f} threshold")
     ax2.axhline(
-        y=threshold_2, color="yellow", linestyle="--", alpha=0.7, label=f"{threshold_2:.3f} threshold"
+        y=threshold_1,
+        color="orange",
+        linestyle="--",
+        alpha=0.7,
+        label=f"{threshold_1:.3f} threshold",
     )
     ax2.axhline(
-        y=threshold_3, color="green", linestyle="--", alpha=0.7, label=f"{threshold_3:.3f} threshold"
+        y=threshold_2,
+        color="yellow",
+        linestyle="--",
+        alpha=0.7,
+        label=f"{threshold_2:.3f} threshold",
     )
-    ax2.axhline(y=threshold_4, color="red", linestyle="--", alpha=0.7, label=f"{threshold_4:.3f} threshold")
+    ax2.axhline(
+        y=threshold_3,
+        color="green",
+        linestyle="--",
+        alpha=0.7,
+        label=f"{threshold_3:.3f} threshold",
+    )
+    ax2.axhline(
+        y=threshold_4,
+        color="red",
+        linestyle="--",
+        alpha=0.7,
+        label=f"{threshold_4:.3f} threshold",
+    )
     ax2.set_title(f"{title_prefix} Curvature vs Point Index")
     ax2.set_xlabel("Point Index")
     ax2.set_ylabel("Curvature")
@@ -119,14 +156,34 @@ def plot_curvature_analysis(points, output_path, title_prefix="Processed", max_c
 
     # Plot 3: Curvature Histogram
     ax3.hist(curvature, bins=50, alpha=0.7, color="skyblue", edgecolor="black")
-    ax3.axvline(x=threshold_1, color="orange", linestyle="--", alpha=0.7, label=f"{threshold_1:.3f} threshold")
     ax3.axvline(
-        x=threshold_2, color="yellow", linestyle="--", alpha=0.7, label=f"{threshold_2:.3f} threshold"
+        x=threshold_1,
+        color="orange",
+        linestyle="--",
+        alpha=0.7,
+        label=f"{threshold_1:.3f} threshold",
     )
     ax3.axvline(
-        x=threshold_3, color="green", linestyle="--", alpha=0.7, label=f"{threshold_3:.3f} threshold"
+        x=threshold_2,
+        color="yellow",
+        linestyle="--",
+        alpha=0.7,
+        label=f"{threshold_2:.3f} threshold",
     )
-    ax3.axvline(x=threshold_4, color="red", linestyle="--", alpha=0.7, label=f"{threshold_4:.3f} threshold")
+    ax3.axvline(
+        x=threshold_3,
+        color="green",
+        linestyle="--",
+        alpha=0.7,
+        label=f"{threshold_3:.3f} threshold",
+    )
+    ax3.axvline(
+        x=threshold_4,
+        color="red",
+        linestyle="--",
+        alpha=0.7,
+        label=f"{threshold_4:.3f} threshold",
+    )
     ax3.set_title(f"{title_prefix} Curvature Distribution")
     ax3.set_xlabel("Curvature")
     ax3.set_ylabel("Frequency")
@@ -137,14 +194,34 @@ def plot_curvature_analysis(points, output_path, title_prefix="Processed", max_c
     sorted_curvature = np.sort(curvature)
     cumulative_prob = np.arange(1, len(sorted_curvature) + 1) / len(sorted_curvature)
     ax4.plot(sorted_curvature, cumulative_prob, "b-", linewidth=2)
-    ax4.axvline(x=threshold_1, color="orange", linestyle="--", alpha=0.7, label=f"{threshold_1:.3f} threshold")
     ax4.axvline(
-        x=threshold_2, color="yellow", linestyle="--", alpha=0.7, label=f"{threshold_2:.3f} threshold"
+        x=threshold_1,
+        color="orange",
+        linestyle="--",
+        alpha=0.7,
+        label=f"{threshold_1:.3f} threshold",
     )
     ax4.axvline(
-        x=threshold_3, color="green", linestyle="--", alpha=0.7, label=f"{threshold_3:.3f} threshold"
+        x=threshold_2,
+        color="yellow",
+        linestyle="--",
+        alpha=0.7,
+        label=f"{threshold_2:.3f} threshold",
     )
-    ax4.axvline(x=threshold_4, color="red", linestyle="--", alpha=0.7, label=f"{threshold_4:.3f} threshold")
+    ax4.axvline(
+        x=threshold_3,
+        color="green",
+        linestyle="--",
+        alpha=0.7,
+        label=f"{threshold_3:.3f} threshold",
+    )
+    ax4.axvline(
+        x=threshold_4,
+        color="red",
+        linestyle="--",
+        alpha=0.7,
+        label=f"{threshold_4:.3f} threshold",
+    )
     ax4.set_title(f"{title_prefix} Curvature Cumulative Distribution")
     ax4.set_xlabel("Curvature")
     ax4.set_ylabel("Cumulative Probability")

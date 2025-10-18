@@ -34,7 +34,9 @@ SECTION_ID = "2"
 LANE_SEGMENT_LENGTH = 100  # Estimated length of each lane segment
 
 
-def calculate_offset_points(p1: Point, p2: Point, distance: float) -> Tuple[List[float], List[float]]:
+def calculate_offset_points(
+    p1: Point, p2: Point, distance: float
+) -> Tuple[List[float], List[float]]:
     vector = np.array([p2.x - p1.x, p2.y - p1.y])
     norm = np.linalg.norm(vector)
     if norm == 0:
@@ -44,18 +46,24 @@ def calculate_offset_points(p1: Point, p2: Point, distance: float) -> Tuple[List
     unit_vector = vector / norm
     normal_vector = np.array([-unit_vector[1], unit_vector[0]])  # Left normal
 
-    left_point = [p1.x + normal_vector[0] * distance,
-                  p1.y + normal_vector[1] * distance]
-    right_point = [p1.x - normal_vector[0] * distance,
-                   p1.y - normal_vector[1] * distance]  # Right normal is the opposite
+    left_point = [
+        p1.x + normal_vector[0] * distance,
+        p1.y + normal_vector[1] * distance,
+    ]
+    right_point = [
+        p1.x - normal_vector[0] * distance,
+        p1.y - normal_vector[1] * distance,
+    ]  # Right normal is the opposite
 
     return left_point, right_point
 
 
-def create_new_lane(map_object: map_pb2.Map, lane_id: int) -> Tuple[map_lane_pb2.Lane,
-                                                                    map_geometry_pb2.CurveSegment,
-                                                                    map_geometry_pb2.CurveSegment,
-                                                                    map_geometry_pb2.CurveSegment]:
+def create_new_lane(map_object: map_pb2.Map, lane_id: int) -> Tuple[
+    map_lane_pb2.Lane,
+    map_geometry_pb2.CurveSegment,
+    map_geometry_pb2.CurveSegment,
+    map_geometry_pb2.CurveSegment,
+]:
     """Creates a new lane object and initializes basic attributes.
 
     Args:
@@ -93,11 +101,15 @@ def create_new_lane(map_object: map_pb2.Map, lane_id: int) -> Tuple[map_lane_pb2
     return lane, central, left_boundary, right_boundary
 
 
-def create_road_section(map_object: map_pb2.Map) -> Tuple[map_road_pb2.RoadSection,
-                                                          map_road_pb2.BoundaryEdge,
-                                                          map_geometry_pb2.CurveSegment,
-                                                          map_road_pb2.BoundaryEdge,
-                                                          map_geometry_pb2.CurveSegment]:
+def create_road_section(
+    map_object: map_pb2.Map,
+) -> Tuple[
+    map_road_pb2.RoadSection,
+    map_road_pb2.BoundaryEdge,
+    map_geometry_pb2.CurveSegment,
+    map_road_pb2.BoundaryEdge,
+    map_geometry_pb2.CurveSegment,
+]:
     """Initializes road and road section information.
 
     Args:
@@ -123,13 +135,20 @@ def create_road_section(map_object: map_pb2.Map) -> Tuple[map_road_pb2.RoadSecti
     return section, left_edge, left_edge_segment, right_edge, right_edge_segment
 
 
-def _add_points_at_index(path: LineString, index: int, central: map_geometry_pb2.CurveSegment,
-                         left_boundary: map_geometry_pb2.CurveSegment, right_boundary: map_geometry_pb2.CurveSegment,
-                         left_edge_segment: map_geometry_pb2.CurveSegment,
-                         right_edge_segment: map_geometry_pb2.CurveSegment, extra_roi_extension: float):
+def _add_points_at_index(
+    path: LineString,
+    index: int,
+    central: map_geometry_pb2.CurveSegment,
+    left_boundary: map_geometry_pb2.CurveSegment,
+    right_boundary: map_geometry_pb2.CurveSegment,
+    left_edge_segment: map_geometry_pb2.CurveSegment,
+    right_edge_segment: map_geometry_pb2.CurveSegment,
+    extra_roi_extension: float,
+):
     if index >= path.length:
         print(
-            f"Warning: Index {index} exceeds path length {path.length}. Skipping point addition.")
+            f"Warning: Index {index} exceeds path length {path.length}. Skipping point addition."
+        )
         return
 
     p1 = path.interpolate(index)
@@ -154,7 +173,8 @@ def _add_points_at_index(path: LineString, index: int, central: map_geometry_pb2
     # 添加左右道路边界点
     edge_distance = distance + extra_roi_extension
     left_edge_point_offset, right_edge_point_offset = calculate_offset_points(
-        p1, p2, edge_distance)
+        p1, p2, edge_distance
+    )
 
     left_edge_point = left_edge_segment.line_segment.point.add()
     left_edge_point.x = left_edge_point_offset[0]
@@ -175,7 +195,11 @@ def _add_lane_samples(lane: map_lane_pb2.Lane, index: int):
     right_sample.width = LANE_WIDTH / 2.0
 
 
-def check_loopback(first_lane: map_lane_pb2.Lane, current_lane: map_lane_pb2.Lane, detection_threshold=1.0) -> bool:
+def check_loopback(
+    first_lane: map_lane_pb2.Lane,
+    current_lane: map_lane_pb2.Lane,
+    detection_threshold=1.0,
+) -> bool:
     if first_lane is None or current_lane is None:
         return False
     if int(current_lane.id.id) < 2:
@@ -184,14 +208,20 @@ def check_loopback(first_lane: map_lane_pb2.Lane, current_lane: map_lane_pb2.Lan
     # Use first_lane point[2], because we need the paths partially overlap
     start_point = first_lane.central_curve.segment[0].point[2]
     end_point = current_lane.central_curve.segment[0].point[-1]
-    dist = np.sqrt((start_point.x - end_point.x)**2 +
-                   (start_point.y - end_point.y)**2)
+    dist = np.sqrt(
+        (start_point.x - end_point.x) ** 2 + (start_point.y - end_point.y) ** 2
+    )
     if dist < detection_threshold:
         return True
     return False
 
 
-def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension: float, enable_loopback: bool = True):
+def process_path(
+    map_object: map_pb2.Map,
+    path: LineString,
+    extra_roi_extension: float,
+    enable_loopback: bool = True,
+):
     """Processes the path, creating lane and road structures.
 
     Args:
@@ -201,12 +231,14 @@ def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension:
     """
     if not isinstance(path.length, (int, float)) or path.length <= 0:
         print(
-            f"Error: Invalid path length: {path.length}. Path length must be a positive numeric value.")
+            f"Error: Invalid path length: {path.length}. Path length must be a positive numeric value."
+        )
         return
     length = int(path.length)
     lane = None
-    section, left_edge, left_edge_segment, right_edge, right_edge_segment = create_road_section(
-        map_object)
+    section, left_edge, left_edge_segment, right_edge, right_edge_segment = (
+        create_road_section(map_object)
+    )
     lane_id_counter = 0
     first_lane = None
 
@@ -215,10 +247,13 @@ def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension:
             lane_id_counter += 1
             if lane is not None:
                 lane.successor_id.add().id = str(lane_id_counter)
-                lane.length = central_points_count * 1.0  # Update previous lane's length
+                lane.length = (
+                    central_points_count * 1.0
+                )  # Update previous lane's length
 
             lane, central, left_boundary, right_boundary = create_new_lane(
-                map_object, lane_id_counter)
+                map_object, lane_id_counter
+            )
             if first_lane is None:
                 first_lane = lane
 
@@ -247,7 +282,8 @@ def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension:
 
                 edge_distance = distance + extra_roi_extension
                 lp_edge, rp_edge = calculate_offset_points(
-                    prev_p, prev_p2, edge_distance)
+                    prev_p, prev_p2, edge_distance
+                )
                 left_edge_point = left_edge_segment.line_segment.point.add()
                 left_edge_point.y = lp_edge[1]
                 left_edge_point.x = lp_edge[0]
@@ -258,13 +294,23 @@ def process_path(map_object: map_pb2.Map, path: LineString, extra_roi_extension:
                 # For the first point of the new lane
                 _add_lane_samples(lane, 0)
 
-        _add_points_at_index(path, i, central, left_boundary, right_boundary,
-                             left_edge_segment, right_edge_segment, extra_roi_extension)
+        _add_points_at_index(
+            path,
+            i,
+            central,
+            left_boundary,
+            right_boundary,
+            left_edge_segment,
+            right_edge_segment,
+            extra_roi_extension,
+        )
         _add_lane_samples(lane, i)
         central_points_count += 1
 
         if lane is not None:
-            lane.length = central_points_count * 1.0  # Update the length of the last lane
+            lane.length = (
+                central_points_count * 1.0
+            )  # Update the length of the last lane
             lane.left_boundary.length = lane.length
             lane.right_boundary.length = lane.length
             # TODO(zero): Use segment[0], Need to ensure that there is only one segment

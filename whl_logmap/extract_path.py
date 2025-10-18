@@ -37,6 +37,7 @@ class SortMode(Enum):
     Args:
         Enum (_type_): Enumeration for sorting modes.
     """
+
     NAME = 1  # Sort by file name
 
 
@@ -55,8 +56,11 @@ def get_sorted_records(input_path: str, sort_mode: SortMode) -> List[str]:
     if os.path.isfile(input_path):
         record_files = [input_path]
     else:
-        record_files = [os.path.join(input_path, f) for f in os.listdir(
-            input_path) if "record" in f and os.path.isfile(os.path.join(input_path, f))]
+        record_files = [
+            os.path.join(input_path, f)
+            for f in os.listdir(input_path)
+            if "record" in f and os.path.isfile(os.path.join(input_path, f))
+        ]
 
     if sort_mode == SortMode.NAME:
         # Sort files by name
@@ -75,7 +79,7 @@ def extract_path(record_files: List[str], output_file: str) -> bool:
     Returns:
         True if the file is successfully written, False otherwise.
     """
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         for record_file in record_files:
             # Read each record file
             record = Record(record_file)
