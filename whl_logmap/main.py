@@ -190,7 +190,7 @@ def main(args=None):
                 forward=forward_dist,
                 backward=backward_dist,
                 spacing=spacing,
-                heading_in_degrees=True,
+                heading_in_degrees=False,
             )
             if not trajectory:
                 logging.error(

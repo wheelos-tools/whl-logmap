@@ -1,10 +1,4 @@
 #!/usr/bin/env python
-"""Trajectory preprocessing module.
-
-This module provides various algorithms for preprocessing trajectory data,
-including outlier filtering, RDP simplification, resampling, smoothing,
-and curvature constraint application.
-"""
 
 # Copyright 2025 daohu527 <daohu527@gmail.com>
 #
@@ -19,6 +13,13 @@ and curvature constraint application.
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Trajectory preprocessing module.
+
+This module provides various algorithms for preprocessing trajectory data,
+including outlier filtering, RDP simplification, resampling, smoothing,
+and curvature constraint application.
+"""
 
 import numpy as np
 from scipy.interpolate import interp1d
