@@ -31,7 +31,12 @@ from modules.map.proto import map_pb2
 from shapely.geometry import LineString
 
 from whl_logmap import map_gen, plots, preprocess, utils
-from whl_logmap.extract_path import SortMode, extract_path, get_sorted_records
+from whl_logmap.extract_path import (
+    SortMode,
+    extract_path,
+    extract_path_reverse,
+    get_sorted_records,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -153,7 +158,7 @@ def main(args=None):
                 )
             else:
                 logging.info(f"Extracting path to: {output_file}")
-                extract_path(record_files, output_file)
+                extract_path_reverse(record_files, output_file)
 
             trajectory = utils.read_points_from_file(output_file)
             if trajectory.size == 0:
@@ -198,6 +203,7 @@ def main(args=None):
                 )
                 sys.exit(1)
 
+            utils.save_points_to_file("test.txt", trajectory)
             # This becomes the final trajectory, no optimization needed
             filtered_trajectory = np.array(trajectory)
             logging.info(

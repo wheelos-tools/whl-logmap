@@ -23,8 +23,9 @@ map data handling, and other common operations.
 import os
 import math
 
+from pathlib import Path
 import numpy as np
-from typing import List, Tuple
+from typing import List, Tuple, Union, Iterable
 
 from modules.map.proto import map_pb2
 from google.protobuf import text_format
@@ -40,6 +41,41 @@ def read_points_from_file(filepath: str) -> np.ndarray:
         A list of tuples containing the coordinates of the path points.
     """
     return np.loadtxt(filepath, delimiter=",")
+
+
+def save_points_to_file(
+    filepath: Union[str, Path],
+    points: Iterable[Tuple[float, float]],
+    fmt: str = "%.15f",
+    overwrite: bool = True,
+) -> None:
+    """
+    简洁版：使用 np.savetxt 把 (x,y) 点写为 "x,y" 每行一对。
+    """
+    dst = Path(filepath)
+
+    # 1. 检查是否覆盖
+    if dst.exists() and not overwrite:
+        raise FileExistsError(f"File already exists: {dst}")
+
+    # 2. 确保父目录存在
+    dst.parent.mkdir(parents=True, exist_ok=True)
+
+    # 3. 转换数据（np.savetxt 内部也会做，但显式转换更安全）
+    try:
+        arr = np.asarray(points, dtype=float)
+        # 处理传入单个点 (x, y) 的情况
+        if arr.ndim == 1 and arr.size == 2:
+            arr = arr.reshape(1, 2)
+        # 确保数据是 N x 2 的形状
+        if arr.ndim != 2 or arr.shape[1] != 2:
+            raise ValueError("Input 'points' must be convertible to an N-by-2 array.")
+    except Exception as e:
+        raise ValueError(f"Could not convert 'points' to N-by-2 array: {e}")
+
+    # 4. 使用 np.savetxt 直接写入
+    # 它会自动处理迭代、格式化和逗号分隔符
+    np.savetxt(dst, arr, delimiter=",", fmt=fmt, encoding="utf-8")
 
 
 def save_map_to_file(map_object: map_pb2.Map, output_filepath: str):

@@ -93,3 +93,25 @@ def extract_path(record_files: List[str], output_file: str) -> bool:
                     f.write(f"{x},{y}\n")
     print(f"File written to: {output_file}")
     return True
+
+
+def extract_path_reverse(
+    record_files: List[str], output_file: str, fmt="%.15f"
+) -> bool:
+    points = []  # (x, y)
+    for record_file in record_files:
+        record = Record(record_file)
+        for topic, message, _ in record.read_messages_fallback():
+            if topic == "/apollo/localization/pose":
+                x = message.pose.position.x
+                y = message.pose.position.y
+                points.append((x, y))
+
+    # Write in reverse order
+    os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
+    with open(output_file, "w", encoding="utf-8") as f:
+        for x, y in reversed(points):
+            f.write(f"{fmt % x},{fmt % y}\n")
+
+    print(f"File written to: {output_file}")
+    return True
