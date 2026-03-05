@@ -27,7 +27,7 @@ import sys
 from typing import List
 import numpy as np
 
-from modules.map.proto import map_pb2
+from modules.common_msgs.map_msgs import map_pb2
 from shapely.geometry import LineString
 
 from whl_logmap import map_gen, plots, preprocess, utils

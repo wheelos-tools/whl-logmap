@@ -26,7 +26,7 @@ import math
 import numpy as np
 from typing import List, Tuple
 
-from modules.map.proto import map_pb2
+from modules.common_msgs.map_msgs import map_pb2
 from google.protobuf import text_format
 
 

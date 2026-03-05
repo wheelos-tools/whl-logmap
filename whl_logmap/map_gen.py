@@ -19,7 +19,12 @@
 from typing import List, Tuple
 import numpy as np
 
-from modules.map.proto import map_pb2, map_lane_pb2, map_road_pb2, map_geometry_pb2
+from modules.common_msgs.map_msgs import (
+    map_pb2,
+    map_lane_pb2,
+    map_road_pb2,
+    map_geometry_pb2,
+)
 from shapely.geometry import LineString, Point
 from google.protobuf import text_format
 
