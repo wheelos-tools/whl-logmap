@@ -32,26 +32,41 @@ from .funcs import calculate_curvature
 # ==============================
 
 
-def filter_outliers(points, kernel_size=3, threshold_factor=3.0):
+def filter_outliers(points, kernel_size=3, threshold_factor=5.0, is_loop=False):
+    """
+    Enhanced outlier filtering using Median Absolute Deviation (MAD).
+    Increased default threshold_factor to preserve sharp corners.
+    """
+    if len(points) < kernel_size:
+        return points
+
     x = points[:, 0]
     y = points[:, 1]
 
-    # Smooth the data using median filter
+    # Smooth the data using median filter (1D)
     x_filtered = medfilt(x, kernel_size)
     y_filtered = medfilt(y, kernel_size)
 
-    # Calculate the absolute difference between original and smoothed data
+    # Calculate absolute difference
     x_diff = np.abs(x - x_filtered)
     y_diff = np.abs(y - y_filtered)
 
-    # Calculate threshold based on median absolute deviation
-    x_threshold = threshold_factor * np.median(x_diff)
-    y_threshold = threshold_factor * np.median(y_diff)
+    # Calculate combined Euclidean distance from median trend
+    combined_diff = np.sqrt(x_diff**2 + y_diff**2)
 
-    # Determine outliers (either x or y deviation exceeds threshold)
-    is_outlier = (x_diff > x_threshold) | (y_diff > y_threshold)
+    # Use Median Absolute Deviation (MAD) for a more robust threshold
+    # mad = median(|xi - median(x)|)
+    # Here we use the median of the diff from the filtered trend
+    median_diff = np.median(combined_diff)
+    std_estimate = (
+        1.4826 * median_diff
+    )  # Scale factor for normal distribution consistency
 
-    # Return non-outlier points using boolean indexing
+    threshold = threshold_factor * (std_estimate + 1e-6)
+
+    # An outlier must deviate significantly in Euclidean space
+    is_outlier = combined_diff > threshold
+
     return points[~is_outlier]
 
 
@@ -142,12 +157,84 @@ def uniform_resample(points, spacing=1.0, kind="cubic"):
     return new_points
 
 
+# =====================================================
+# 3.5 Loopback Processing: Detect and Weld
+# =====================================================
+
+
+def process_loopback(
+    points, distance_threshold=1.0, min_loop_length=20.0, blend_distance=10.0
+):
+    """
+    Detects and perfectly closes a loop in the trajectory by welding the gap.
+
+    Args:
+      points: (N,2) array of uniform resampled trajectory points.
+      distance_threshold: Maximum gap to consider as a valid loop (e.g. 1.0m).
+      min_loop_length: Distances (m) to skip at the start before checking loop (e.g. 20m).
+      blend_distance: Length of tail segment (m) to distribute the gap error gradually.
+
+    Returns:
+      (points, is_loop): The modified points and a boolean flag.
+    """
+    if len(points) < 2:
+        return points, False
+
+    start_pt = points[0]
+
+    # Calculate cumulative path distance
+    distances = np.linalg.norm(np.diff(points, axis=0), axis=1)
+    path_dists = np.concatenate(([0], np.cumsum(distances)))
+
+    # Candidate points must be beyond the initial 'min_loop_length'
+    valid_mask = path_dists > min_loop_length
+    if not np.any(valid_mask):
+        return points, False
+
+    valid_indices = np.where(valid_mask)[0]
+    dists_to_start = np.linalg.norm(points[valid_indices] - start_pt, axis=1)
+
+    # Check if we have any points within the threshold
+    min_dist_val = np.min(dists_to_start)
+    if min_dist_val > distance_threshold:
+        return points, False
+
+    # Find the BEST point (closest to start) to weld
+    # This helps in case of overlapping tails or multiple points in threshold
+    best_valid_idx = np.argmin(dists_to_start)
+    loop_idx = valid_indices[best_valid_idx]
+
+    # Cut off redundant overlapping tail
+    looped_points = points[: loop_idx + 1].copy()
+
+    # Welding Process (distribute the gap over blend_distance so no sudden jump happens)
+    gap_vector = start_pt - looped_points[-1]
+
+    # Distribute the error on the last 'blend_distance' segment
+    blend_mask = path_dists[: loop_idx + 1] > (path_dists[loop_idx] - blend_distance)
+    blend_indices = np.where(blend_mask)[0]
+
+    if len(blend_indices) > 0:
+        # Linear weight from 0 to 1
+        weights = np.linspace(0, 1, len(blend_indices))
+        weighted_gap = weights[:, np.newaxis] * gap_vector
+        looped_points[blend_indices] += weighted_gap
+    else:
+        # Fallback for very short loops
+        looped_points[-1] = start_pt
+
+    # Strictly ensure perfect boundary closure
+    looped_points[-1] = looped_points[0]
+
+    return looped_points, True
+
+
 # ================================================
 # 4. Smoothing: Savitzky-Golay Filter
 # ================================================
 
 
-def smooth_track(points, window_length=5, polyorder=3):
+def smooth_track(points, window_length=5, polyorder=3, is_loop=False):
     """
     Smooth trajectory points using Savitzky-Golay filter.
 
@@ -155,14 +242,38 @@ def smooth_track(points, window_length=5, polyorder=3):
       points: (N,2) array of uniformly resampled points
       window_length: smoothing window size (must be odd)
       polyorder: order of the polynomial used in filtering
+      is_loop: bool, if true, uses wrap mode for periodic boundaries
 
     Returns:
       Smoothed trajectory points
     """
+    # Safeguard window_length: must be odd and <= len(points)
+    if len(points) < window_length:
+        window_length = len(points)
+        if window_length % 2 == 0:
+            window_length -= 1
+
+    # Safeguard polyorder: must be STRICTLY LESS than window_length
+    if polyorder >= window_length:
+        polyorder = max(1, window_length - 1)
+
+    if window_length < 3:
+        return points  # Too few points to smooth
+
+    # Use 'wrap' mode for closed loops to perfectly smooth the joints!
+    mode = "wrap" if is_loop else "interp"
+
     # Apply the filter to x and y separately
-    x_smooth = savgol_filter(points[:, 0], window_length, polyorder)
-    y_smooth = savgol_filter(points[:, 1], window_length, polyorder)
-    return np.column_stack((x_smooth, y_smooth))
+    x_smooth = savgol_filter(points[:, 0], window_length, polyorder, mode=mode)
+    y_smooth = savgol_filter(points[:, 1], window_length, polyorder, mode=mode)
+
+    smoothed = np.column_stack((x_smooth, y_smooth))
+
+    if is_loop:
+        # Ensure exact match of endpoints even after float operations
+        smoothed[-1] = smoothed[0]
+
+    return smoothed
 
 
 # =====================================================
@@ -170,397 +281,87 @@ def smooth_track(points, window_length=5, polyorder=3):
 # =====================================================
 
 
-def apply_curvature_constraint(
-    points, max_curvature=0.2, smoothing_factor=0.3, max_iterations=100
-):
-    """
-    Apply iterative curvature constraint using adaptive smoothing.
-
-    Optimization Theory:
-    This method solves the constrained optimization problem:
-
-    min ||P - P*||₂  subject to κ(P*) ≤ κ_max
-
-    Where P* is the optimized trajectory and κ_max is the curvature limit.
-
-    Algorithm Strategy:
-    1. Iterative Refinement: Apply smoothing until all constraints are satisfied
-    2. Adaptive Weighting: Smoothing intensity depends on violation severity
-    3. Local Smoothing: Only modify points that violate constraints
-
-    Mathematical Formulation:
-    For each violation point p_i with curvature κ_i > κ_max:
-
-    p_i^(new) = (1 - w_i) * p_i^(old) + w_i * p_i^(smooth)
-
-    Where:
-    - w_i = min(smoothing_factor * (κ_i / κ_max), 0.8) is the adaptive weight
-    - p_i^(smooth) is the smoothed point using local averaging
-
-    Convergence Analysis:
-    - Guaranteed convergence within max_iterations (100)
-    - Each iteration reduces curvature violations
-    - Smoothing weight is bounded to prevent over-smoothing
-
-    Numerical Stability:
-    - Uses 5-point smoothing kernel for better stability
-    - Fallback to 3-point smoothing at boundaries
-    - Weight capping prevents numerical instability
-
-    Args:
-        points: (N,2) array of trajectory points
-        max_curvature: maximum allowed curvature (κ_max)
-        smoothing_factor: base smoothing intensity (0-1)
-        max_iterations: maximum number of iterations
-
-    Returns:
-        Curvature-constrained trajectory points
-    """
-    if len(points) < 3:
-        return points
-
-    # Create a copy to modify
-    constrained_points = points.copy()
-
-    # Use while loop with maximum iterations
-    iteration = 0
-
-    while iteration < max_iterations:
-        current_curvature = calculate_curvature(constrained_points)
-        violation_mask = current_curvature > max_curvature
-
-        if not np.any(violation_mask):
-            break  # All constraints satisfied
-
-        # Apply stronger smoothing to violation regions
-        for i in range(1, len(constrained_points) - 1):
-            if violation_mask[i]:
-                # Calculate adaptive smoothing weight based on violation severity
-                violation_ratio = current_curvature[i] / max_curvature
-                weight = min(smoothing_factor * violation_ratio, 0.8)  # Cap at 0.8
-
-                # Use weighted average with more neighbors for better smoothing
-                if 1 < i < len(constrained_points) - 2:
-                    # Use 5-point smoothing for better results
-                    smoothed_point = (
-                        0.1 * constrained_points[i - 2]
-                        + 0.2 * constrained_points[i - 1]
-                        + 0.4 * constrained_points[i]
-                        + 0.2 * constrained_points[i + 1]
-                        + 0.1 * constrained_points[i + 2]
-                    )
-                else:
-                    # Fallback to 3-point smoothing
-                    smoothed_point = 0.5 * (
-                        constrained_points[i - 1] + constrained_points[i + 1]
-                    )
-
-                constrained_points[i] = (1 - weight) * constrained_points[
-                    i
-                ] + weight * smoothed_point
-
-        iteration += 1
-
-    return constrained_points
-
-
-def adaptive_curvature_constraint(
-    points, max_curvature=0.2, window_size=7, max_iterations=100
-):
-    """
-    Apply adaptive curvature constraint using Savitzky-Golay filtering.
-
-    Advanced Optimization Theory:
-    This method uses a two-tier approach based on violation severity:
-
-    1. Severe Violations (κ > 2 * κ_max):
-       - Applies strong Savitzky-Golay filter with polynomial order 2
-       - Uses 5-point window for robust smoothing
-       - Mathematical basis: SG filter minimizes least-squares error of polynomial fit
-
-    2. Moderate Violations (κ_max < κ ≤ 2 * κ_max):
-       - Applies light Savitzky-Golay filter with polynomial order 1
-       - Uses 3-point window for minimal distortion
-       - Preserves trajectory shape while reducing curvature
-
-    Savitzky-Golay Filter Theory:
-    The SG filter fits a polynomial of degree p to a window of 2m+1 points:
-
-    ŷ_i = Σ(k=-m to m) c_k * y_{i+k}
-
-    Where c_k are coefficients that minimize:
-    Σ(k=-m to m) (y_{i+k} - ŷ_{i+k})²
-
-    For our application:
-    - p=2 (quadratic) for severe violations: smooths aggressively
-    - p=1 (linear) for moderate violations: preserves linear trends
-
-    Convergence Properties:
-    - Monotonic decrease in violation count
-    - Bounded smoothing prevents over-correction
-    - Local windowing preserves global trajectory structure
-
-    Numerical Advantages:
-    - SG filter is more stable than simple averaging
-    - Polynomial fitting reduces noise while preserving signal
-    - Adaptive window size handles varying violation densities
-
-    Args:
-        points: (N,2) array of trajectory points
-        max_curvature: maximum allowed curvature (κ_max)
-        window_size: size of smoothing window for high-curvature regions
-        max_iterations: maximum number of iterations
-
-    Returns:
-        Curvature-constrained trajectory points
-    """
-    if len(points) < 3:
-        return points
-
-    constrained_points = points.copy()
-
-    # Use while loop with maximum iterations
-    iteration = 0
-
-    while iteration < max_iterations:
-        curvature = calculate_curvature(constrained_points)
-        high_curvature_indices = np.where(curvature > max_curvature)[0]
-
-        if len(high_curvature_indices) == 0:
-            break  # All constraints satisfied
-
-        # Apply local smoothing to high-curvature regions
-        for idx in high_curvature_indices:
-            # Define smoothing window around the high-curvature point
-            start_idx = max(0, idx - window_size // 2)
-            end_idx = min(len(constrained_points), idx + window_size // 2 + 1)
-
-            # Calculate violation severity
-            violation_ratio = curvature[idx] / max_curvature
-
-            # Apply stronger smoothing for more severe violations
-            if violation_ratio > 2.0:  # Severe violation
-                # Use stronger Savitzky-Golay filter
-                try:
-                    window_points = constrained_points[start_idx:end_idx]
-                    if len(window_points) >= 5:
-                        x_smooth = savgol_filter(window_points[:, 0], 5, 2)
-                        y_smooth = savgol_filter(window_points[:, 1], 5, 2)
-                        constrained_points[start_idx:end_idx] = np.column_stack(
-                            (x_smooth, y_smooth)
-                        )
-                except Exception:
-                    # Fallback to simple averaging
-                    for i in range(1, len(window_points) - 1):
-                        constrained_points[start_idx + i] = 0.5 * (
-                            constrained_points[start_idx + i - 1]
-                            + constrained_points[start_idx + i + 1]
-                        )
-            else:  # Moderate violation
-                # Use lighter smoothing
-                try:
-                    window_points = constrained_points[start_idx:end_idx]
-                    if len(window_points) >= 3:
-                        x_smooth = savgol_filter(
-                            window_points[:, 0], min(len(window_points), 3), 1
-                        )
-                        y_smooth = savgol_filter(
-                            window_points[:, 1], min(len(window_points), 3), 1
-                        )
-                        constrained_points[start_idx:end_idx] = np.column_stack(
-                            (x_smooth, y_smooth)
-                        )
-                except Exception:
-                    # Fallback to simple averaging
-                    for i in range(1, len(window_points) - 1):
-                        constrained_points[start_idx + i] = 0.3 * constrained_points[
-                            start_idx + i
-                        ] + 0.7 * 0.5 * (
-                            constrained_points[start_idx + i - 1]
-                            + constrained_points[start_idx + i + 1]
-                        )
-
-        iteration += 1
-
-    return constrained_points
-
-
-def strict_curvature_constraint(points, max_curvature=0.2, max_iterations=100):
-    """
-    Apply strict curvature constraint using aggressive smoothing with global fallback.
-
-    Rigorous Optimization Theory:
-    This method implements a two-phase optimization strategy:
-
-    Phase 1: Local Aggressive Smoothing
-    - Applies maximum smoothing to violation points
-    - Uses adaptive smoothing strength based on violation ratio
-    - Mathematical formulation:
-
-      p_i^(new) = (1 - α_i) * p_i^(old) + α_i * p_i^(avg)
-
-      Where α_i = min(0.9, 0.5 + 0.3 * (κ_i / κ_max - 1))
-
-    Phase 2: Global Smoothing (if violations persist)
-    - Triggered when >10% of points violate constraints after 10 iterations
-    - Applies global Savitzky-Golay filter to entire trajectory
-    - Mathematical basis: Global smoothing reduces high-frequency components
-
-    Convergence Analysis:
-    - Guaranteed termination within max_iterations
-    - Monotonic improvement in constraint satisfaction
-    - Global fallback ensures convergence even for pathological cases
-
-    Mathematical Properties:
-    1. Contraction Mapping: Each iteration reduces the constraint violation
-    2. Bounded Distortion: Smoothing strength is capped to prevent over-correction
-    3. Global Stability: Fallback mechanism prevents infinite loops
-
-    Numerical Stability:
-    - Adaptive smoothing strength prevents numerical instability
-    - Global smoothing provides robust fallback
-    - Iteration limit prevents infinite loops
-
-    Complexity Analysis:
-    - Time Complexity: O(n * k) where n is trajectory length, k is iterations
-    - Space Complexity: O(n) for storing intermediate results
-    - Typical convergence: 5-20 iterations for most trajectories
-
-    Args:
-        points: (N,2) array of trajectory points
-        max_curvature: maximum allowed curvature (κ_max)
-        max_iterations: maximum number of iterations
-
-    Returns:
-        Curvature-constrained trajectory points
-    """
-    if len(points) < 3:
-        return points
-
-    constrained_points = points.copy()
-
-    # Use while loop with maximum iterations
-    iteration = 0
-
-    while iteration < max_iterations:
-        curvature = calculate_curvature(constrained_points)
-        violation_indices = np.where(curvature > max_curvature)[0]
-
-        if len(violation_indices) == 0:
-            break  # All constraints satisfied
-
-        # Apply aggressive smoothing to violation points
-        for idx in violation_indices:
-            if 0 < idx < len(constrained_points) - 1:
-                # Calculate how much we need to smooth
-                violation_ratio = curvature[idx] / max_curvature
-                smoothing_strength = min(0.9, 0.5 + 0.3 * (violation_ratio - 1.0))
-
-                # Apply strong smoothing
-                constrained_points[idx] = (1 - smoothing_strength) * constrained_points[
-                    idx
-                ] + smoothing_strength * 0.5 * (
-                    constrained_points[idx - 1] + constrained_points[idx + 1]
-                )
-
-        # Additional global smoothing if violations persist
-        if iteration > 10 and len(violation_indices) > len(points) * 0.1:
-            # Apply global smoothing to the entire trajectory
-            try:
-                x_smooth = savgol_filter(
-                    constrained_points[:, 0], min(len(constrained_points), 7), 2
-                )
-                y_smooth = savgol_filter(
-                    constrained_points[:, 1], min(len(constrained_points), 7), 2
-                )
-                constrained_points = np.column_stack((x_smooth, y_smooth))
-            except Exception:
-                pass
-
-        iteration += 1
-
-    return constrained_points
-
-
-# =====================================================
-# Pipeline: A Full Trajectory Optimization Example
 # =====================================================
 
 
 def optimize_trajectory(
     raw_points,
     kernel_size=3,
-    threshold_factor=3.0,
-    rdp_epsilon=0.05,
-    resample_spacing=1.0,
-    smooth_window=5,
+    threshold_factor=5.0,
+    rdp_epsilon=0.01,
+    resample_spacing=0.5,
+    smooth_window=7,
     smooth_polyorder=3,
     max_curvature=None,
-    curvature_constraint_method="adaptive",
-    max_iterations=100,
+    enable_loopback=False,
+    loopback_threshold=2.0,
+    interactive=False,
 ):
     """
-    Given raw trajectory points, perform the following:
-      1. Outlier filtering
-      2. RDP simplification (reduce dense segments)
-      3. Uniform resampling (fill sparse segments)
-      4. Savitzky-Golay smoothing
-      5. Curvature constraint
-
-    Args:
-      raw_points: (N,2) original trajectory points
-      rdp_epsilon: RDP simplification threshold
-      resample_spacing: spacing for uniform resampling
-      smooth_window, smooth_polyorder: smoothing parameters
-      max_curvature: maximum allowed curvature
-      curvature_constraint_method: method for applying curvature constraint
-                                  ('adaptive', 'iterative', 'strict')
-      max_iterations: maximum number of iterations for curvature constraint
-
-    Returns:
-      Optimized trajectory points
+    Trajectory optimization pipeline.
+    Updated default parameters for better balance between smoothing and shape preservation.
     """
-    # 1. Filter outliers
-    filtered_points = filter_outliers(raw_points, kernel_size, threshold_factor)
+    # 3.8 Optional Interactive Editor
+    is_loop = False
+    if interactive:
+        try:
+            from .interactive import launch_interactive_editor
 
-    # 2. Simplify trajectory using RDP
-    simplified_points = rdp(filtered_points, epsilon=rdp_epsilon)
+            (
+                resampled_points,
+                enable_loopback,
+                threshold_factor,
+                rdp_epsilon,
+                resample_spacing,
+                smooth_window,
+                max_curvature,
+            ) = launch_interactive_editor(
+                raw_points,
+                enable_loopback,
+                loopback_threshold,
+                threshold_factor,
+                rdp_epsilon,
+                resample_spacing,
+                smooth_window,
+                smooth_polyorder,
+                max_curvature,
+            )
+            is_loop = enable_loopback
+        except Exception as e:
+            print(
+                f"Warning: Could not load interactive module ({e}). Continuing without GUI."
+            )
+            interactive = False
 
-    # 3. Resample for uniform spacing
-    resampled_points = uniform_resample(
-        simplified_points, spacing=resample_spacing, kind="linear"
-    )
+    if not interactive:
+        # 1. Filter outliers
+        filtered_points = filter_outliers(
+            raw_points, kernel_size, threshold_factor, is_loop=enable_loopback
+        )
+
+        # 2. Simplify trajectory using RDP
+        simplified_points = rdp(filtered_points, epsilon=rdp_epsilon)
+
+        # 3. Resample for uniform spacing
+        resampled_points = uniform_resample(
+            simplified_points, spacing=resample_spacing, kind="linear"
+        )
+
+        # 3.5 Handle Loopback (Detect and Weld)
+        if enable_loopback:
+            resampled_points, is_loop = process_loopback(
+                resampled_points,
+                distance_threshold=loopback_threshold,
+                min_loop_length=20.0,
+                blend_distance=10.0,
+            )
 
     # 4. Smooth the trajectory
     smoothed_points = smooth_track(
-        resampled_points, window_length=smooth_window, polyorder=smooth_polyorder
+        resampled_points,
+        window_length=smooth_window,
+        polyorder=smooth_polyorder,
+        is_loop=is_loop,
     )
 
-    # 5. Apply curvature constraint if specified
-    if max_curvature is not None:
-        if curvature_constraint_method == "adaptive":
-            final_points = adaptive_curvature_constraint(
-                smoothed_points,
-                max_curvature=max_curvature,
-                max_iterations=max_iterations,
-            )
-        elif curvature_constraint_method == "iterative":
-            final_points = apply_curvature_constraint(
-                smoothed_points,
-                max_curvature=max_curvature,
-                max_iterations=max_iterations,
-            )
-        elif curvature_constraint_method == "strict":
-            final_points = strict_curvature_constraint(
-                smoothed_points,
-                max_curvature=max_curvature,
-                max_iterations=max_iterations,
-            )
-        else:
-            raise ValueError(
-                f"Unknown curvature constraint method: {curvature_constraint_method}"
-            )
-    else:
-        final_points = smoothed_points
-
-    return final_points
+    return smoothed_points, is_loop, max_curvature
