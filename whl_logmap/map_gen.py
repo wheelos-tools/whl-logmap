@@ -36,7 +36,7 @@ DEFAULT_LANE_TURN = map_lane_pb2.Lane.NO_TURN
 BOUNDARY_TYPE = map_lane_pb2.LaneBoundaryType.DOTTED_YELLOW
 ROAD_ID = "1"
 SECTION_ID = "2"
-LANE_SEGMENT_LENGTH = 100  # Estimated length of each lane segment
+LANE_SEGMENT_LENGTH = 50  # Estimated length of each lane segment
 
 
 def calculate_offset_points(
@@ -210,9 +210,10 @@ def check_loopback(
     if int(current_lane.id.id) < 2:
         return False
 
-    # Use first_lane point[2], because we need the paths partially overlap
-    start_point = first_lane.central_curve.segment[0].point[2]
-    end_point = current_lane.central_curve.segment[0].point[-1]
+    # Use first_lane line_segment.point[0], because CurveSegment stores
+    # geometry under `line_segment.point` (proto field), not `point` directly.
+    start_point = first_lane.central_curve.segment[0].line_segment.point[0]
+    end_point = current_lane.central_curve.segment[0].line_segment.point[-1]
     dist = np.sqrt(
         (start_point.x - end_point.x) ** 2 + (start_point.y - end_point.y) ** 2
     )
@@ -226,6 +227,7 @@ def process_path(
     path: LineString,
     extra_roi_extension: float,
     enable_loopback: bool = True,
+    loopback_threshold: float = 1.0,
 ):
     """Processes the path, creating lane and road structures.
 
@@ -233,6 +235,8 @@ def process_path(
         map_object: The map object.
         path: The centerline path of the road.
         extra_roi_extension: The extra ROI extension distance.
+        enable_loopback: Whether to enable loopback detection and welding.
+        loopback_threshold: The distance threshold for detecting loopback.
     """
     if not isinstance(path.length, (int, float)) or path.length <= 0:
         print(
@@ -321,7 +325,7 @@ def process_path(
             # TODO(zero): Use segment[0], Need to ensure that there is only one segment
             lane.central_curve.segment[0].length = lane.length
 
-        if enable_loopback and check_loopback(first_lane, lane):
+        if enable_loopback and check_loopback(first_lane, lane, loopback_threshold):
             lane.successor_id.add().id = first_lane.id.id
             first_lane.predecessor_id.add().id = lane.id.id
             break

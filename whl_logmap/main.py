@@ -106,26 +106,25 @@ def main(args=None):
         type=float,
         default=None,
         help="Maximum allowed curvature (default: None, no curvature constraint). "
-        "Recommended values: 95% of vehicle limit.",
+        "Recommended values: 95%% of vehicle limit.",
     )
     parser.add_argument(
-        "--curvature_method",
-        type=str,
-        default="strict",
-        choices=["adaptive", "iterative", "strict"],
-        help="Curvature constraint method (default: strict, only used when "
-        "--max_curvature is specified). Available methods: "
-        "adaptive (Savitzky-Golay based), iterative (adaptive smoothing), strict (aggressive smoothing)",
+        "--loopback_threshold",
+        type=float,
+        default=3.0,
+        help="Distance threshold for loopback detection in meters (default: 3.0).",
     )
     parser.add_argument(
-        "--max_iterations",
-        type=int,
-        default=100,
-        help="Maximum number of iterations for curvature constraint algorithms "
-        "(default: 100, only used when --max_curvature is specified). "
-        "If curvature constraints are not satisfied, try increasing this value.",
+        "--interactive",
+        action="store_true",
+        default=True,
+        help="Enable interactive GUI to manually edit control points and smoothing parameters (Default is True).",
     )
-
+    parser.add_argument(
+        "--no_interactive",
+        action="store_true",
+        help="Disable interactive GUI and run headlessly.",
+    )
     parsed_args = parser.parse_args(args)
 
     input_path = parsed_args.input_path
@@ -134,8 +133,8 @@ def main(args=None):
     force = parsed_args.force
     enable_loopback = parsed_args.enable_loopback
     max_curvature = parsed_args.max_curvature
-    curvature_method = parsed_args.curvature_method
-    max_iterations = parsed_args.max_iterations
+    loopback_threshold = parsed_args.loopback_threshold
+    interactive = False if parsed_args.no_interactive else parsed_args.interactive
 
     try:
         if not os.path.exists(output_path):
@@ -163,19 +162,22 @@ def main(args=None):
                 sys.exit(1)
 
             # Sampling and smoothing curves with optional curvature constraint
-            filtered_trajectory = preprocess.optimize_trajectory(
-                trajectory,
-                kernel_size=3,
-                threshold_factor=3.0,
-                rdp_epsilon=0.01,
-                resample_spacing=0.5,
-                smooth_window=10,
-                smooth_polyorder=3,
-                max_curvature=max_curvature,
-                curvature_constraint_method=curvature_method,
-                max_iterations=max_iterations,
+            filtered_trajectory, enable_loopback, max_curvature = (
+                preprocess.optimize_trajectory(
+                    trajectory,
+                    kernel_size=3,
+                    threshold_factor=3.0,
+                    rdp_epsilon=0.01,
+                    resample_spacing=0.5,
+                    smooth_window=10,
+                    smooth_polyorder=3,
+                    max_curvature=max_curvature,
+                    enable_loopback=enable_loopback,
+                    loopback_threshold=loopback_threshold,
+                    interactive=interactive,
+                )
             )
-            logging.info("Filtered trajectory points without curvature constraint.")
+            logging.info("Filtered trajectory points.")
         elif parsed_args.path_params:
             params = parsed_args.path_params
             defaults = [50.0, 0.0, 0.5]  # Defaults for forward, backward, spacing
@@ -211,7 +213,13 @@ def main(args=None):
         map_data = map_pb2.Map()
         path = LineString(filtered_trajectory)
         logging.info("Processing path to generate map data.")
-        map_gen.process_path(map_data, path, extra_roi_extension, enable_loopback)
+        map_gen.process_path(
+            map_data,
+            path,
+            extra_roi_extension,
+            enable_loopback,
+            loopback_threshold=loopback_threshold,
+        )
 
         logging.info(f"Saving map data to: {output_path}")
         utils.save_map_to_file(map_data, output_path)
@@ -241,9 +249,7 @@ def main(args=None):
             print(
                 f"Max curvature after processing: {curvature_stats['max_curvature']:.6f}"
             )
-            print(
-                f"Curvature constraint: {max_curvature:.3f} (method: {curvature_method})"
-            )
+            print(f"Curvature constraint limit: {max_curvature:.3f}")
             if curvature_stats["max_curvature"] <= max_curvature:
                 print(f"✓ Curvature constraint satisfied (≤ {max_curvature:.3f})")
             else:
@@ -256,15 +262,9 @@ def main(args=None):
                     f"  Violations: {violations} points ({violation_percentage:.2f}%)"
                 )
                 print("\n💡 Suggested solutions:")
-                print(
-                    f"   1. Increase iterations: --max_iterations {max_iterations * 2}"
-                )
-                print(
-                    f"   2. Try different method: --curvature_method {'adaptive' if curvature_method == 'strict' else 'strict'}"
-                )
-                print(
-                    f"   3. Relax curvature limit: --max_curvature {max_curvature * 1.2:.3f}"
-                )
+                print(f"   1. Drag high curvature points manually in interactive mode.")
+                print(f"   2. Increase smoothing window in interactive mode.")
+
     except Exception as e:
         logging.error(f"An unexpected error occurred: {e}")
         sys.exit(1)
